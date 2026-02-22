@@ -1,0 +1,258 @@
+// TypeScript 类型定义，镜像 Python Pydantic 模型
+
+export type AuthType = 'api_key' | 'browser' | 'oauth' | 'none';
+export type ParserType = 'jsonpath' | 'css' | 'regex' | 'script';
+export type HttpMethod = 'GET' | 'POST';
+
+// Extended component types for high information density
+export type ViewComponentType =
+    | 'metric'
+    | 'line_chart'
+    | 'bar_chart'
+    | 'table'
+    | 'json'
+    | 'quota_card'
+    | 'progress_bar'
+    | 'stat_grid'
+    | 'badge'
+    | 'mini_chart'
+    | 'source_card';
+export type ViewLayoutType = 'columns' | 'tabs';
+
+export interface FieldMapping {
+    name: string;
+    expr: string;
+    type: string;
+}
+export interface WidgetConfigBase {
+    type: string;
+    area?: string;
+}
+
+export interface HeroMetricWidget extends WidgetConfigBase {
+    type: 'hero_metric';
+    amount: string;
+    currency?: string;
+    prefix?: string;
+    delta?: string;
+}
+
+export interface KeyValueGridWidget extends WidgetConfigBase {
+    type: 'key_value_grid';
+    items: Record<string, string>;
+}
+
+export interface QuotaBarWidget extends WidgetConfigBase {
+    type: 'quota_bar';
+    title?: string;
+    usage: string;
+    limit: string;
+    color_thresholds?: {
+        warning_percent?: number;
+        critical_percent?: number;
+    };
+}
+
+export interface ListWidgetConfig extends WidgetConfigBase {
+    type: 'list';
+    data_source: string;
+    item_alias?: string;
+    layout?: 'col' | 'row' | 'grid';
+    layout_config?: {
+        grid_template_areas?: string[];
+        grid_template_columns?: string;
+    };
+    filter?: string;
+    limit?: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    render: WidgetConfig | WidgetConfig[];
+}
+
+export type WidgetConfig = HeroMetricWidget | KeyValueGridWidget | QuotaBarWidget | ListWidgetConfig;
+
+export interface ParserConfig {
+    type: ParserType;
+    fields: FieldMapping[];
+    script?: string;
+}
+
+export interface RequestConfig {
+    url: string;
+    method: HttpMethod;
+    headers: Record<string, string>;
+    params: Record<string, string>;
+    body?: Record<string, any>;
+    timeout: number;
+}
+
+export interface AuthConfig {
+    type: AuthType;
+    api_key?: string;
+    header_name: string;
+    header_prefix: string;
+    browser: string;
+    domain?: string;
+    client_id?: string;
+    client_secret?: string;
+    auth_url?: string;
+    token_url?: string;
+    scopes: string[];
+    redirect_uri: string;
+}
+
+export interface ScheduleConfig {
+    cron?: string;
+    interval_minutes: number;
+}
+
+export interface SourceConfig {
+    id: string;
+    name: string;
+    description: string;
+    icon?: string;
+    enabled: boolean;
+    auth: AuthConfig;
+    request: RequestConfig;
+    parser: ParserConfig;
+    schedule: ScheduleConfig;
+    flow?: StepConfig[];
+}
+
+export type StepType = 'http' | 'oauth' | 'extract' | 'script' | 'log';
+
+export interface StepConfig {
+    id: string;
+    run?: string;
+    use: StepType;
+    args: Record<string, any>;
+    outputs: Record<string, string>;
+}
+
+// Extended ViewComponent with more properties
+export interface ViewComponent {
+    type: ViewComponentType;
+    source_id?: string;
+    field?: string;
+    icon?: string;
+    label: string;
+    format?: string;
+    delta_field?: string;
+    // For source_card type
+    ui?: {
+        title: string;
+        icon?: string;
+        status_field?: string;
+    };
+    widgets?: WidgetConfig[];
+    // For component groups
+    use_group?: string;
+    group_vars?: Record<string, string>;
+    // For quota_card type
+    limit_field?: string;
+    usage_field?: string;
+    remaining_field?: string;
+    // For progress_bar type
+    value_field?: string;
+    max_field?: string;
+    // For stat_grid type
+    items?: StatGridItem[];
+    columns?: number;
+    // For color customization
+    color?: string;
+    // For badge type
+    true_label?: string;
+    false_label?: string;
+}
+
+export interface StatGridItem {
+    field: string;
+    label: string;
+    format?: string;
+    icon?: string;
+    color?: string;
+}
+
+export interface ViewItem {
+    id: string;
+    w: number;
+    h: number;
+    source_id: string;
+    template_id: string;
+    props: Record<string, any>;
+}
+
+export interface StoredView {
+    id: string;
+    name: string;
+    layout_columns: number;
+    items: ViewItem[];
+}
+
+// API 响应类型
+
+export interface SourceSummary {
+    id: string;
+    name: string;
+    integration_id?: string;
+    description: string;
+    icon?: string;
+    enabled: boolean;
+    auth_type: string;
+    has_data: boolean;
+    updated_at?: number;
+    error?: string;
+    // Runtime State
+    status: SourceStatus;
+    message?: string;
+    interaction?: InteractionRequest;
+}
+
+export type SourceStatus = 'active' | 'error' | 'suspended' | 'disabled';
+export type InteractionType = 'input_text' | 'oauth_start' | 'captcha' | 'confirm';
+
+export interface InteractionField {
+    key: string;
+    label: string;
+    type: string;
+    description?: string;
+    required: boolean;
+    default?: any;
+}
+
+export interface InteractionRequest {
+    type: InteractionType;
+    step_id: string;
+    message?: string;
+    fields: InteractionField[];
+    data?: Record<string, any>;
+}
+
+export interface SourceState {
+    source_id: string;
+    status: SourceStatus;
+    message?: string;
+    last_updated: number;
+    suspended_step_id?: string;
+    interaction?: InteractionRequest;
+}
+
+export interface DataResponse {
+    source_id: string;
+    data: Record<string, any> | null;
+    updated_at?: number;
+    error?: string;
+}
+
+export interface HistoryRecord {
+    source_id: string;
+    data: Record<string, any>;
+    timestamp: number;
+}
+
+export interface AuthStatus {
+    source_id: string;
+    auth_type: string;
+    status: 'ok' | 'error' | 'missing' | 'expired';
+    message?: string;
+}

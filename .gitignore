@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Data (TinyDB)
+data/*.json
+data/tokens/
+
+# Config (含敏感 API Key)
+config/config.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PyInstaller
+*.spec
+
+# Tauri sidecar binaries (built by PyInstaller)
+ui-react/src-tauri/binaries/
+ui-react/src-tauri/target/
+ui-react/src-tauri/gen/

@@ -1,0 +1,366 @@
+# CONFIG.md - 配置与集成指南
+
+本文档详细说明 Quota Board 的配置架构。
+
+## 架构概述
+
+Quota Board 采用双层配置模式：
+
+1. **Integration（集成）**：YAML 配置文件，定义通用的 API 请求逻辑和**视图模板**。
+2. **Source & View（数据源与视图）**：JSON 文件（通过 API 管理），引用 Integration 并配置具体实例。
+
+```
+YAML (Integration + Templates) ──→ API/JSON (Sources + Views) ──→ React UI
+```
+
+配置文件路径（Integration）：
+- 多文件模式（推荐）：`config/integrations/` 目录下的所有 `.yaml` 文件会自动扫描并合并。
+- 其他配置：`config/sources/` 目录用于存放数据源相关配置。
+
+---
+
+## 一、集成配置 (`integrations`)
+
+将通用的 API 请求逻辑抽离为模版，供多个数据源复用。
+
+### 结构
+
+```yaml
+integrations:
+  - id: <唯一标识符>
+    name: <显示名称>
+    description: <描述>
+    flow:                    # Flow 编排步骤
+      - ...
+    templates:               # [新增] 视图模板列表
+      - ...
+```
+
+### 视图模板 (`templates`)
+
+在 Integration 中定义可复用的 UI 组件模板。
+
+```yaml
+integrations:
+  - id: openrouter_keys
+    templates:
+      - type: metric
+        field: total_usage
+        label: "Total Usage"
+        format: "${value:.4f}"
+      - type: badge
+        field: status
+        label: "Status"
+```
+
+**支持的模板类型**：
+
+| 类型 | 说明 |
+|------|------|
+| `metric` | 指标卡片 |
+| `line_chart` | 折线图 |
+| `bar_chart` | 柱状图 |
+| `table` | 数据表格 |
+| `json` | JSON 原始数据 |
+| `badge` | 状态徽章 |
+| `quota_card` | 配额卡片 |
+| `stat_grid` | 统计网格 |
+
+---
+
+## 二、Flow 编排配置
+
+当单一的 HTTP 请求无法满足需求时（例如需要先获取 Token 再请求数据，或需要 OAuth 授权后获取列表），使用 `flow` 定义一系列有序的执行步骤。
+
+### 2.1 变量作用域与优先级
+
+Flow 执行引擎支持三种变量类型，并按优先级检索：
+
+| 优先级 | 类型 | 作用域 | 说明 |
+|--------|------|--------|------|
+| 1 | `outputs` | 单步变量 | 仅传递给下一步，步骤执行完毕后不可再访问 |
+| 2 | `context` | 全局变量 | 持久化在整个流程中，后续所有步骤均可访问 |
+| 3 | `secrets` | 密钥存储 | 来自 `SecretsController`，用于长期存储的凭证 |
+
+#### 变量引用语法
+
+在 `args` 中使用 `{variable_name}` 语法引用变量：
+
+```yaml
+- id: fetch_data
+  use: http
+  args:
+    url: "https://api.example.com/users/{username}"
+    headers:
+      Authorization: "Bearer {access_token}"
+```
+
+#### outputs - 单步变量
+
+定义在步骤的 `outputs` 字段中，仅在下一步中有效：
+
+```yaml
+- id: get_token
+  use: http
+  args:
+    url: "https://auth.example.com/token"
+    method: POST
+  outputs:
+    json.access_token: access_token  # 保存到 access_token 变量
+
+- id: get_data
+  use: http
+  args:
+    url: "https://api.example.com/data"
+    # 在这里可以使用 {access_token}，因为它是上一步的 outputs
+```
+
+#### context - 全局变量
+
+初始值为 `source.vars`，可通过步骤 outputs 逐步累加。持久化在整个流程中。
+
+#### secrets - 密钥存储
+
+用于长期存储敏感信息（如 Token）。需要在步骤中显式声明 `secrets` 字段才会存储：
+
+```yaml
+- id: oauth_auth
+  use: oauth
+  args:
+    auth_url: "https://auth.example.com/authorize"
+    token_url: "https://auth.example.com/token"
+  outputs:
+    access_token: "access_token"
+  secrets:
+    - access_token  # 显式声明：将 access_token 存储到 SecretsController
+```
+
+> **注意**：Flow 模式移除了隐式的 Authorization 头注入和隐式的 secrets 存储。必须在步骤中显式定义 `headers` 和 `secrets`。
+
+### 2.2 Flow 完整示例
+
+```yaml
+integrations:
+  - id: openrouter_keys_apikey
+    name: "OpenRouter Keys List (API Key)"
+    description: "Fetch all API keys and their usage via Management API Key"
+
+    flow:
+      # Step 1: Authentication (Get API Key)
+      - id: auth
+        use: api_key
+        args:
+          secret_key: "api_key"
+          label: "Management API Key"
+          description: "Input your OpenRouter Management API Key"
+        outputs:
+          access_token: "access_token"
+        # 显式存储 access_token 到 SecretsController
+        secrets:
+          - access_token
+
+      # Step 2: Fetch Keys List (with explicit Authorization header)
+      - id: fetch
+        use: http
+        args:
+          url: "https://openrouter.ai/api/v1/keys"
+          method: "GET"
+          headers:
+            Authorization: "Bearer {access_token}"
+        outputs:
+          http_response: "http_response"
+
+      # Step 3: Extract Data
+      - id: parse
+        use: extract
+        args:
+          source: "{http_response}"
+          type: "jsonpath"
+          expr: "$.data"
+        outputs:
+          keys_list: "keys_list"
+```
+
+### 2.3 步骤类型 (`use`)
+
+| 类型 | 说明 |
+|------|------|
+| `api_key` | 获取用户输入的 API Key |
+| `http` | 发送 HTTP 请求 |
+| `oauth` | 处理 OAuth 授权和 Token 获取 |
+| `extract` | 数据提取（JSONPath/Regex/Key） |
+| `log` | 打印日志（调试用） |
+
+---
+
+## 三、步骤类型详解
+
+### `api_key` - API Key 注入
+
+用于获取用户输入的 API Key。
+
+- `args`:
+  - `secret_key`: string (必填，密钥ID)
+  - `label`: string (前端显示的标签)
+  - `description`: string (可选，描述信息)
+- `outputs`:
+  - `access_token`: 将密钥值保存到变量
+
+### `http` - 发送 HTTP 请求
+
+发送 HTTP 请求。**注意**：必须显式在 `headers` 中定义 `Authorization` 头，不会自动注入。
+
+- `args`:
+  - `url`: string (必填)
+  - `method`: GET | POST (默认 GET)
+  - `headers`: dict (显式定义请求头)
+  - `params`: dict
+  - `body`: dict (JSON body)
+  - `timeout`: float
+- `outputs`:
+  - `http_response`: 整个响应 JSON 对象
+  - `raw_data`: 响应文本
+  - `headers`: 响应头字典
+
+### `oauth` - OAuth 流程
+
+用于处理 OAuth 授权和 Token 获取。
+
+- `args`:
+  - `auth_url`: string
+  - `token_url`: string
+  - `doc_url`: string (可选，用于向用户展示如何创建 OAuth 应用)
+  - `scopes`: list
+  - `supports_pkce`: bool (可选，是否支持 PKCE，默认 true)
+  - `token_request_type`: string (可选，`form` 或 `json`)
+- `outputs`:
+  - `access_token`: 获取到的 OAuth Token
+
+### `extract` - 数据提取
+
+用于从变量中提取复杂结构数据。
+
+- `args`:
+  - `source`: string (源变量，支持 `{var}`)
+  - `type`: "jsonpath" | "regex" | "key"
+  - `expr`: string (表达式)
+- `outputs`: 提取结果保存到变量
+
+### `log` - 打印日志
+
+用于调试流程。
+
+- `args`:
+  - `message`: string (支持 `{var}` 变量替换)
+
+---
+
+## 四、数据源管理 (Sources)
+
+**注意**：数据源配置已从 YAML 迁移到 JSON 存储，通过 API 管理。
+
+### 存储位置
+- 文件：`data/sources.json`
+- API：`GET/POST /api/sources`, `PUT/DELETE /api/sources/{id}`
+
+### 数据结构
+
+```json
+{
+  "id": "my_source",
+  "integration_id": "openrouter_keys_apikey",
+  "name": "My OpenRouter Keys",
+  "config": {
+    "api_key": "sk-or-xxx"
+  },
+  "vars": {
+    "param1": "value1"
+  }
+}
+```
+
+### 字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | 唯一标识符 |
+| `integration_id` | string | 引用的 Integration ID |
+| `name` | string | 显示名称 |
+| `config` | object | 认证配置和特定设置 |
+| `vars` | object | 模板变量 |
+
+---
+
+## 五、视图管理 (Views)
+
+**注意**：视图配置已从 YAML 迁移到 JSON 存储，通过 API 管理。
+
+### 存储位置
+- 文件：`data/views.json`
+- API：`GET/POST /api/views`, `PUT/DELETE /api/views/{id}`
+
+### 数据结构
+
+```json
+{
+  "id": "main_view",
+  "name": "Main Dashboard",
+  "layout_columns": 12,
+  "items": [
+    {
+      "id": "widget_1",
+      "x": 0,
+      "y": 0,
+      "w": 4,
+      "h": 4,
+      "source_id": "my_source",
+      "template_id": "metric_usage",
+      "props": {
+        "label": "Custom Label"
+      }
+    }
+  ]
+}
+```
+
+### 字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | 唯一标识符 |
+| `name` | string | 视图名称 |
+| `layout_columns` | int | 网格列数（默认12，支持24） |
+| `items` | array | 视图项列表 |
+
+### ViewItem 字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | 唯一标识符 |
+| `x` | int | 网格列起始位置 |
+| `y` | int | 网格行起始位置 |
+| `w` | int | 宽度（列数） |
+| `h` | int | 高度（行数） |
+| `source_id` | string | 关联的数据源 ID |
+| `template_id` | string | 关联的 Integration 模板 ID |
+| `props` | object | 模板属性覆盖 |
+
+---
+
+## 六、组件组 (`component_groups`) [Legacy]
+
+> **注意**：此功能已逐步被 Integration Templates 取代。建议在新配置中使用 `templates` 字段。
+
+---
+
+## 七、快速集成清单
+
+要接入一个新的第三方平台，按以下步骤操作：
+
+1. **确认鉴权方式**：API Key? OAuth?
+2. **找到目标 API**：确定 URL、方法、需要的参数
+3. **编写 Flow 步骤**：在 `integrations` YAML 中定义 flow 编排
+4. **定义视图模板**：在 `integrations` YAML 中添加 `templates`
+5. **创建数据源**：调用 `POST /api/sources` 创建 JSON 配置
+6. **创建视图**：调用 `POST /api/views` 创建视图布局
+7. **重启后端**：`python main.py`，观察日志确认采集成功
