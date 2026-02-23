@@ -425,9 +425,13 @@ async def refresh_browser_cookie(source_id: str) -> dict:
 # ── Stored Sources (JSON-based) ──────────────────────────────────────────
 
 @router.post("/sources")
-async def create_stored_source(source: StoredSource) -> StoredSource:
+async def create_stored_source(source: StoredSource, background_tasks: BackgroundTasks) -> StoredSource:
     """创建新的存储数据源。"""
-    return _resource_manager.save_source(source)
+    saved = _resource_manager.save_source(source)
+    resolved = _resolve_stored_source(saved)
+    if resolved:
+        background_tasks.add_task(_executor.fetch_source, resolved)
+    return saved
 
 
 @router.put("/sources/{source_id}")
@@ -548,12 +552,22 @@ async def reload_config() -> dict:
     new_config = load_config()
 
     # 找出受影响的源（配置发生变化的集成所对应的源）
+    changed_integrations = set()
+    for new_int in new_config.integrations:
+        old_int = _config.get_integration(new_int.id)
+        if old_int is None or old_int.model_dump() != new_int.model_dump():
+            changed_integrations.add(new_int.id)
+
+    for old_int in _config.integrations:
+        if new_config.get_integration(old_int.id) is None:
+            changed_integrations.add(old_int.id)
+
     affected_sources = []
 
     # 从 JSON 存储获取数据源
     stored_sources = _resource_manager.load_sources()
     for stored in stored_sources:
-        if stored.integration_id:
+        if stored.integration_id and stored.integration_id in changed_integrations:
             # 标记该源为 CONFIG_CHANGED
             state = _executor.get_source_state(stored.id)
             state.status = SourceStatus.CONFIG_CHANGED

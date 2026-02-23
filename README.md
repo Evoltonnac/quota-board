@@ -21,7 +21,6 @@ quota-board/
 │   ├── auth/                   # 鉴权策略
 │   │   ├── manager.py          # 鉴权策略分发器 + httpx 客户端池
 │   │   ├── apikey_auth.py      # API Key / Header 注入（支持 ${ENV_VAR}）
-│   │   ├── browser_auth.py     # 浏览器 Cookie 读取（Chrome/Edge/Firefox）
 │   │   └── oauth_auth.py       # OAuth 授权码流 + Token 持久化 + 自动刷新
 │   ├── executor.py             # 任务执行器（APScheduler 定时调度 + 采集管道）
 │   ├── parser.py               # 数据解析器（JSONPath / CSS Selector / Regex / Script）
@@ -57,7 +56,6 @@ quota-board/
 | **驱动层** | FastAPI + Uvicorn | REST API 服务（端口 8400） |
 | | APScheduler | 定时任务调度（cron / interval） |
 | | httpx | 异步 HTTP 客户端 |
-| | browser_cookie3 | 浏览器 Cookie 读取 |
 | **解析层** | jsonpath-ng | JSON 响应字段提取 |
 | | BeautifulSoup4 + lxml | HTML/CSS Selector 解析 |
 | **存储层** | TinyDB | 轻量 NoSQL 本地存储 |
@@ -90,7 +88,7 @@ YAML (Integration + Templates) ──→ Config Loader ──→ Auth Manager �
 ```
 
 - **配置层**：YAML 定义 Integrations（含视图模板），JSON 定义 Sources/Views
-- **驱动层**：FastAPI 提供 REST API，APScheduler 按配置定时执行采集管道（支持 HTTP/OAuth/Script 等步骤）
+- **驱动层**：FastAPI 提供 REST API，APScheduler 按配置定时执行采集管道（支持 HTTP/OAuth/Script/cURL 等步骤）
 - **资源层**：ResourceManager 管理 JSON 文件存储
 - **展现层**：React 前端通过 API 获取数据并动态渲染看板
 - **桌面层**：Tauri v2 将前端 + 后端（Sidecar）打包为跨平台桌面应用
@@ -203,9 +201,8 @@ python main.py 9000     # 自定义端口
 |------|------|------|
 | `GET` | `/api/sources/{source_id}/auth-status` | 查询鉴权状态 |
 | `POST` | `/api/auth/apikey/{source_id}` | 运行时更新 API Key |
-| `POST` | `/api/auth/cookie/refresh/{source_id}` | 刷新浏览器 Cookie |
 | `GET` | `/api/oauth/authorize/{source_id}` | 获取 OAuth 授权 URL |
-| `POST` | `/api/sources/{source_id}/interact` | 处理交互请求（提交 API Key、OAuth 授权等） |
+| `POST` | `/api/sources/{source_id}/interact` | 处理交互请求（提交 API Key、OAuth 授权、cURL 命令等） |
 | `GET` | `/api/config` | 获取当前配置摘要（脱敏） |
 
 > **注意**：OAuth 回调由前端处理，URL 格式为 `{前端域名}/oauth/callback`

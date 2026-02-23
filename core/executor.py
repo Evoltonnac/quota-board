@@ -7,6 +7,7 @@ import logging
 import time
 import asyncio
 import httpx
+import shlex
 from typing import Any, Dict
 
 from core.source_state import (
@@ -167,6 +168,49 @@ class Executor:
 
                      # Output into outputs (single step variable)
                      output = {list(step.outputs.keys())[0]: api_key} if step.outputs else {"access_token": api_key}
+
+                elif step.use == StepType.CURL:
+                     secret_key = args.get("secret_key", "curl_command")
+                     curl_command = self._secrets.get_secret(source.id, secret_key)
+                     
+                     if not curl_command:
+                         raise RequiredSecretMissing(
+                             source_id=source.id,
+                             interaction_type=InteractionType.INPUT_TEXT,
+                             fields=[
+                                 InteractionField(
+                                     key=secret_key,
+                                     label=args.get("label", "cURL Request"),
+                                     type="text",
+                                     description=args.get("description", "Paste your cURL command here")
+                                 )
+                             ],
+                             message=args.get("message", f"Provide cURL request for {source.name}"),
+                             warning_message=args.get("warning_message")
+                         )
+                         
+                     extracted_headers = {}
+                     try:
+                         # Split the cURL command safely handling quotes
+                         tokens = shlex.split(curl_command)
+                         for i, token in enumerate(tokens):
+                             if token in ("-H", "--header") and i + 1 < len(tokens):
+                                 header_str = tokens[i + 1]
+                                 if ":" in header_str:
+                                     k, v = header_str.split(":", 1)
+                                     extracted_headers[k.strip()] = v.strip()
+                     except Exception as e:
+                         logger.error(f"Failed to parse cURL command for step {step.id}: {e}")
+                         
+                     output = {}
+                     for key, var_name in step.outputs.items():
+                         if key == "headers":
+                             output[key] = extracted_headers
+                         else:
+                             # search case-insensitively just in case
+                             val = next((v for k, v in extracted_headers.items() if k.lower() == key.lower()), None)
+                             if val is not None:
+                                 output[key] = val
 
                 elif step.use == StepType.OAUTH:
                      # OAuth token always stored under source.id
@@ -413,6 +457,7 @@ class Executor:
                 source_id=error.source_id,
                 title="Authentication Required",
                 message=error.message,
+                warning_message=error.warning_message,
                 fields=error.fields,
                 data=error.data
             )
@@ -428,10 +473,11 @@ class Executor:
 
 class RequiredSecretMissing(Exception):
     """自定义异常：缺少必要凭证。"""
-    def __init__(self, source_id: str, interaction_type: InteractionType, fields: list[InteractionField], message: str, data: dict = None):
+    def __init__(self, source_id: str, interaction_type: InteractionType, fields: list[InteractionField], message: str, data: dict = None, warning_message: str = None):
         self.source_id = source_id
         self.interaction_type = interaction_type
         self.fields = fields
         self.message = message
         self.data = data
+        self.warning_message = warning_message
         super().__init__(message)

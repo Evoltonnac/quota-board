@@ -47,6 +47,7 @@ class InteractionRequest(BaseModel):
 
     title: str = "Action Required"
     message: Optional[str] = None
+    warning_message: Optional[str] = None
     
     fields: List[InteractionField] = Field(default_factory=list)
     data: Dict[str, Any] | None = None # 其他元数据 (e.g. oauth_url)

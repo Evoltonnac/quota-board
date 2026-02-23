@@ -226,6 +226,7 @@ export interface InteractionRequest {
     type: InteractionType;
     step_id: string;
     message?: string;
+    warning_message?: string;
     fields: InteractionField[];
     data?: Record<string, any>;
 }

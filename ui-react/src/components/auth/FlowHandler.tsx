@@ -76,8 +76,7 @@ export function FlowHandler({
         try {
             // 2. If user entered client_id/client_secret, save them first
             // This ensures the credentials are stored before getting the authorize URL
-            const hasCredentials =
-                formData.client_id || formData.client_secret;
+            const hasCredentials = formData.client_id || formData.client_secret;
             if (hasCredentials) {
                 await api.interact(source.id, formData);
             }
@@ -143,33 +142,39 @@ export function FlowHandler({
                 return (
                     <div className="py-6 flex flex-col items-center gap-4">
                         {/* Render client_id/client_secret input fields if present */}
-                        {interaction.fields && interaction.fields.length > 0 && (
-                            <div className="w-full space-y-4">
-                                {interaction.fields.map((field) => (
-                                    <div key={field.key} className="grid gap-2">
-                                        <label
-                                            htmlFor={field.key}
-                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        {interaction.fields &&
+                            interaction.fields.length > 0 && (
+                                <div className="w-full space-y-4">
+                                    {interaction.fields.map((field) => (
+                                        <div
+                                            key={field.key}
+                                            className="grid gap-2"
                                         >
-                                            {field.label}
-                                        </label>
-                                        <Input
-                                            id={field.key}
-                                            type={field.type || "text"}
-                                            placeholder={field.description}
-                                            value={formData[field.key] || ""}
-                                            onChange={(e) =>
-                                                handleInputChange(
-                                                    field.key,
-                                                    e.target.value,
-                                                )
-                                            }
-                                            disabled={loading}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                                            <label
+                                                htmlFor={field.key}
+                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                            >
+                                                {field.label}
+                                            </label>
+                                            <Input
+                                                id={field.key}
+                                                type={field.type || "text"}
+                                                placeholder={field.description}
+                                                value={
+                                                    formData[field.key] || ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleInputChange(
+                                                        field.key,
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                disabled={loading}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
 
                         {/* Render doc_url link if available */}
                         {docUrl && (
@@ -241,6 +246,13 @@ export function FlowHandler({
                             : "Please provide the requested information."}
                     </DialogDescription>
                 </DialogHeader>
+
+                {interaction.warning_message && (
+                    <div className="bg-orange-500/15 text-orange-600 dark:text-orange-400 text-sm p-3 rounded-md flex items-start gap-2 mt-4 mx-4">
+                        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <div>{interaction.warning_message}</div>
+                    </div>
+                )}
 
                 {error && (
                     <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md flex items-center gap-2">

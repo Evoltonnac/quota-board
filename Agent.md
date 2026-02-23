@@ -38,7 +38,6 @@ Quota Board 是一个**配置驱动**的个人资源监控看板。核心理念�
 | `apscheduler` | 3.10.4 | 定时任务调度 | 驱动层 |
 | `httpx` | 0.28.0 | 异步 HTTP 客户端 | 驱动层 |
 | `tinydb` | 4.8.0 | 轻量 NoSQL 存储 | 存储层 |
-| `browser-cookie3` | 0.19.1 | 浏览器 Cookie 读取 | 鉴权层 |
 | `jsonpath-ng` | 1.7.0 | JSONPath 解析 | 解析层 |
 | `beautifulsoup4` | 4.12.0 | HTML CSS Selector 解析 | 解析层 |
 | `lxml` | 5.3.0 | HTML 解析后端 | 解析层 |

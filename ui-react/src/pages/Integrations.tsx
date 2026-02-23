@@ -57,7 +57,8 @@ export default function IntegrationsPage() {
     const [sources, setSources] = useState<any[]>([]);
 
     // Dialogs
-    const [showNewIntegrationDialog, setShowNewIntegrationDialog] = useState(false);
+    const [showNewIntegrationDialog, setShowNewIntegrationDialog] =
+        useState(false);
     const [showNewSourceDialog, setShowNewSourceDialog] = useState(false);
     const [newFilename, setNewFilename] = useState("");
     const [newSourceName, setNewSourceName] = useState("");
@@ -69,15 +70,6 @@ export default function IntegrationsPage() {
             setIntegrations(files);
         } catch (err) {
             console.error("Failed to load integrations:", err);
-        }
-    }, []);
-
-    const loadSources = useCallback(async () => {
-        try {
-            const data = await api.getStoredSources();
-            setSources(data);
-        } catch (err) {
-            console.error("Failed to load sources:", err);
         }
     }, []);
 
@@ -101,10 +93,9 @@ export default function IntegrationsPage() {
     useEffect(() => {
         const init = async () => {
             await loadIntegrations();
-            await loadSources();
         };
         init();
-    }, [loadIntegrations, loadSources]);
+    }, [loadIntegrations]);
 
     const handleSave = async () => {
         if (!selectedFile) return;
@@ -121,7 +112,9 @@ export default function IntegrationsPage() {
             // Trigger config reload
             const result = await api.reloadConfig();
             if (result.affected_sources.length > 0) {
-                setSuccess(`Saved! Reloaded config. Affected sources: ${result.affected_sources.join(", ")}`);
+                setSuccess(
+                    `Saved! Reloaded config. Affected sources: ${result.affected_sources.join(", ")}`,
+                );
             }
 
             setTimeout(() => setSuccess(null), 3000);
@@ -136,12 +129,20 @@ export default function IntegrationsPage() {
         if (!newFilename) return;
 
         try {
-            await api.createIntegrationFile(newFilename.endsWith(".yaml") ? newFilename : `${newFilename}.yaml`);
+            await api.createIntegrationFile(
+                newFilename.endsWith(".yaml")
+                    ? newFilename
+                    : `${newFilename}.yaml`,
+            );
             await loadIntegrations();
             setShowNewIntegrationDialog(false);
             setNewFilename("");
             // Load the newly created file
-            await loadIntegrationContent(newFilename.endsWith(".yaml") ? newFilename : `${newFilename}.yaml`);
+            await loadIntegrationContent(
+                newFilename.endsWith(".yaml")
+                    ? newFilename
+                    : `${newFilename}.yaml`,
+            );
         } catch (err: any) {
             setError(err.message || "Failed to create integration");
         }
@@ -167,14 +168,20 @@ export default function IntegrationsPage() {
         if (!newSourceName) return;
 
         try {
-            const integrationId = selectedFile ? selectedFile.replace(".yaml", "") : newSourceIntegration;
+            const integrationId = selectedFile
+                ? selectedFile.replace(".yaml", "")
+                : newSourceIntegration;
 
             await api.createSourceFile({
                 name: newSourceName,
-                integration_id: integrationId
+                integration_id: integrationId,
             });
 
-            await loadSources();
+            if (selectedFile) {
+                const relatedSources =
+                    await api.getIntegrationSources(selectedFile);
+                setSources(relatedSources);
+            }
             setShowNewSourceDialog(false);
             setNewSourceName("");
             setNewSourceIntegration("");
@@ -187,11 +194,16 @@ export default function IntegrationsPage() {
     };
 
     const handleDeleteSource = async (sourceId: string) => {
-        if (!confirm(`Are you sure you want to delete source "${sourceId}"?`)) return;
+        if (!confirm(`Are you sure you want to delete source "${sourceId}"?`))
+            return;
 
         try {
             await api.deleteSourceFile(sourceId);
-            await loadSources();
+            if (selectedFile) {
+                const relatedSources =
+                    await api.getIntegrationSources(selectedFile);
+                setSources(relatedSources);
+            }
 
             // Reload config
             await api.reloadConfig();
@@ -225,15 +237,24 @@ export default function IntegrationsPage() {
                                 <FileJson className="w-4 h-4" />
                                 Integrations
                             </h2>
-                            <Dialog open={showNewIntegrationDialog} onOpenChange={setShowNewIntegrationDialog}>
+                            <Dialog
+                                open={showNewIntegrationDialog}
+                                onOpenChange={setShowNewIntegrationDialog}
+                            >
                                 <DialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                    >
                                         <Plus className="h-4 w-4" />
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
-                                        <DialogTitle>New Integration</DialogTitle>
+                                        <DialogTitle>
+                                            New Integration
+                                        </DialogTitle>
                                         <DialogDescription>
                                             Create a new integration YAML file.
                                         </DialogDescription>
@@ -242,14 +263,27 @@ export default function IntegrationsPage() {
                                         <Input
                                             placeholder="filename.yaml"
                                             value={newFilename}
-                                            onChange={(e) => setNewFilename(e.target.value)}
+                                            onChange={(e) =>
+                                                setNewFilename(e.target.value)
+                                            }
                                         />
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="outline" onClick={() => setShowNewIntegrationDialog(false)}>
+                                        <Button
+                                            variant="outline"
+                                            onClick={() =>
+                                                setShowNewIntegrationDialog(
+                                                    false,
+                                                )
+                                            }
+                                        >
                                             Cancel
                                         </Button>
-                                        <Button onClick={handleCreateIntegration}>Create</Button>
+                                        <Button
+                                            onClick={handleCreateIntegration}
+                                        >
+                                            Create
+                                        </Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -295,7 +329,9 @@ export default function IntegrationsPage() {
                             </div>
                         ))}
                         {integrations.length === 0 && (
-                            <p className="text-xs text-muted-foreground p-2">No integrations found</p>
+                            <p className="text-xs text-muted-foreground p-2">
+                                No integrations found
+                            </p>
                         )}
                     </div>
                 </aside>
@@ -307,9 +343,13 @@ export default function IntegrationsPage() {
                             {/* Toolbar */}
                             <div className="h-14 border-b border-border px-4 flex items-center justify-between bg-card/50">
                                 <div className="flex items-center gap-2">
-                                    <h3 className="font-medium">{selectedFile}</h3>
+                                    <h3 className="font-medium">
+                                        {selectedFile}
+                                    </h3>
                                     {content !== originalContent && (
-                                        <Badge variant="secondary">Unsaved</Badge>
+                                        <Badge variant="secondary">
+                                            Unsaved
+                                        </Badge>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -330,26 +370,37 @@ export default function IntegrationsPage() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => loadIntegrationContent(selectedFile)}
+                                                onClick={() =>
+                                                    loadIntegrationContent(
+                                                        selectedFile,
+                                                    )
+                                                }
                                             >
                                                 <RefreshCw className="h-4 w-4 mr-1" />
                                                 Reload
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent>Reload file from disk</TooltipContent>
+                                        <TooltipContent>
+                                            Reload file from disk
+                                        </TooltipContent>
                                     </Tooltip>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button
                                                 size="sm"
                                                 onClick={handleSave}
-                                                disabled={saving || content === originalContent}
+                                                disabled={
+                                                    saving ||
+                                                    content === originalContent
+                                                }
                                             >
                                                 <Save className="h-4 w-4 mr-1" />
                                                 {saving ? "Saving..." : "Save"}
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent>Save (Ctrl+S)</TooltipContent>
+                                        <TooltipContent>
+                                            Save (Ctrl+S)
+                                        </TooltipContent>
                                     </Tooltip>
                                 </div>
                             </div>
@@ -360,7 +411,9 @@ export default function IntegrationsPage() {
                                     height="100%"
                                     defaultLanguage="yaml"
                                     value={content}
-                                    onChange={(value) => setContent(value || "")}
+                                    onChange={(value) =>
+                                        setContent(value || "")
+                                    }
                                     theme="vs-dark"
                                     options={{
                                         minimap: { enabled: false },
@@ -376,9 +429,13 @@ export default function IntegrationsPage() {
                                 <div className="p-3 border-b border-border flex items-center justify-between">
                                     <h3 className="text-sm font-semibold flex items-center gap-2">
                                         <Database className="w-4 h-4" />
-                                        Sources using this integration ({sources.length})
+                                        Sources using this integration (
+                                        {sources.length})
                                     </h3>
-                                    <Dialog open={showNewSourceDialog} onOpenChange={setShowNewSourceDialog}>
+                                    <Dialog
+                                        open={showNewSourceDialog}
+                                        onOpenChange={setShowNewSourceDialog}
+                                    >
                                         <DialogTrigger asChild>
                                             <Button variant="outline" size="sm">
                                                 <Plus className="h-4 w-4 mr-1" />
@@ -387,42 +444,81 @@ export default function IntegrationsPage() {
                                         </DialogTrigger>
                                         <DialogContent>
                                             <DialogHeader>
-                                                <DialogTitle>Create Source</DialogTitle>
+                                                <DialogTitle>
+                                                    Create Source
+                                                </DialogTitle>
                                                 <DialogDescription>
-                                                    Create a new data source based on this integration.
+                                                    Create a new data source
+                                                    based on this integration.
                                                 </DialogDescription>
                                             </DialogHeader>
                                             <div className="py-4 space-y-4">
                                                 <div>
-                                                    <label className="text-sm font-medium">Source Name</label>
+                                                    <label className="text-sm font-medium">
+                                                        Source Name
+                                                    </label>
                                                     <Input
                                                         placeholder="My Source Name"
                                                         value={newSourceName}
-                                                        onChange={(e) => setNewSourceName(e.target.value)}
+                                                        onChange={(e) =>
+                                                            setNewSourceName(
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         className="mt-1"
                                                     />
                                                     <p className="text-xs text-muted-foreground mt-1">
-                                                        ID will be auto-generated from the name.
+                                                        ID will be
+                                                        auto-generated from the
+                                                        name.
                                                     </p>
                                                 </div>
                                                 <div>
-                                                    <label className="text-sm font-medium">Integration (Optional)</label>
+                                                    <label className="text-sm font-medium">
+                                                        Integration (Optional)
+                                                    </label>
                                                     <Input
-                                                        placeholder={selectedFile.replace(".yaml", "")}
-                                                        value={newSourceIntegration || selectedFile.replace(".yaml", "")}
-                                                        onChange={(e) => setNewSourceIntegration(e.target.value)}
+                                                        placeholder={selectedFile.replace(
+                                                            ".yaml",
+                                                            "",
+                                                        )}
+                                                        value={
+                                                            newSourceIntegration ||
+                                                            selectedFile.replace(
+                                                                ".yaml",
+                                                                "",
+                                                            )
+                                                        }
+                                                        onChange={(e) =>
+                                                            setNewSourceIntegration(
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         className="mt-1"
                                                     />
                                                     <p className="text-xs text-muted-foreground mt-1">
-                                                        Leave as the current integration or change to another.
+                                                        Leave as the current
+                                                        integration or change to
+                                                        another.
                                                     </p>
                                                 </div>
                                             </div>
                                             <DialogFooter>
-                                                <Button variant="outline" onClick={() => setShowNewSourceDialog(false)}>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setShowNewSourceDialog(
+                                                            false,
+                                                        )
+                                                    }
+                                                >
                                                     Cancel
                                                 </Button>
-                                                <Button onClick={handleCreateSource}>Create</Button>
+                                                <Button
+                                                    onClick={handleCreateSource}
+                                                >
+                                                    Create
+                                                </Button>
                                             </DialogFooter>
                                         </DialogContent>
                                     </Dialog>
@@ -431,16 +527,25 @@ export default function IntegrationsPage() {
                                     {sources.length > 0 ? (
                                         <div className="grid gap-2">
                                             {sources.map((source) => (
-                                                <Card key={source.id} className="bg-secondary/50">
+                                                <Card
+                                                    key={source.id}
+                                                    className="bg-secondary/50"
+                                                >
                                                     <CardContent className="p-3 flex items-center justify-between">
                                                         <div>
-                                                            <span className="font-medium">{source.name}</span>
+                                                            <span className="font-medium">
+                                                                {source.name}
+                                                            </span>
                                                             <span className="text-xs text-muted-foreground ml-2">
-                                                                (ID: {source.id})
+                                                                (ID: {source.id}
+                                                                )
                                                             </span>
                                                             {source.integration_id && (
                                                                 <span className="text-xs text-muted-foreground ml-2">
-                                                                    via {source.integration_id}
+                                                                    via{" "}
+                                                                    {
+                                                                        source.integration_id
+                                                                    }
                                                                 </span>
                                                             )}
                                                         </div>
@@ -448,7 +553,11 @@ export default function IntegrationsPage() {
                                                             variant="ghost"
                                                             size="icon"
                                                             className="h-8 w-8 text-destructive"
-                                                            onClick={() => handleDeleteSource(source.id)}
+                                                            onClick={() =>
+                                                                handleDeleteSource(
+                                                                    source.id,
+                                                                )
+                                                            }
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
@@ -470,7 +579,8 @@ export default function IntegrationsPage() {
                                 <CardHeader>
                                     <CardTitle>Select an Integration</CardTitle>
                                     <CardDescription>
-                                        Choose an integration from the sidebar or create a new one.
+                                        Choose an integration from the sidebar
+                                        or create a new one.
                                     </CardDescription>
                                 </CardHeader>
                             </Card>

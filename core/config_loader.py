@@ -134,6 +134,7 @@ class StepType(str, Enum):
     HTTP = "http"
     OAUTH = "oauth"
     API_KEY = "api_key"
+    CURL = "curl"
     EXTRACT = "extract"
     SCRIPT = "script"
     LOG = "log"
