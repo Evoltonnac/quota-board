@@ -27,7 +27,9 @@ The view layer of this project evolves towards a "low-code / configuration-drive
 ## Architecture Model: Standard Blackbox Base + Dynamic Micro-Slots
 
 The entire view layer is abstracted into a two-dimensional system: **`Base Source Card` + `Widgets Slots`**. 
-We utilize a seamless, waterfall-like layout. The exact placement and footprint of widgets flow dynamically based on the available structural space, rather than relying on hardcoded, fixed-pixel dimensioning. Components respond automatically to parent grid configurations.
+We utilize a seamless, waterfall-like layout (Masonry). The exact placement and footprint of widgets flow dynamically based on their configured width (`columns_span`). 
+
+**Crucially, all fixed "row" or "height" configurations have been completely removed.** Height must be 100% content-driven and auto-adaptive (`max-content`). This ensures true dynamic wrapping and eliminates the problem of content truncation or awkward empty gaps associated with hardcoded grid rows. If a component is likely to expand indefinitely (like a List), it must handle height internally via Data Pagination or content threshold clipping rather than relying on an external preset height constraint. Components respond automatically to parent grid configurations laterally, and adapt vertically.
 
 ### 1. Base Source Card (Shell Specification, Non-customizable)
 Every mounted cloud platform service, regardless of the unique data it returns, must be wrapped in this standard shell.

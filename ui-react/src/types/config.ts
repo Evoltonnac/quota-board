@@ -58,12 +58,15 @@ export interface ListWidgetConfig extends WidgetConfigBase {
     data_source: string;
     item_alias?: string;
     layout?: 'col' | 'row' | 'grid';
+    columns?: number; // 用于 list 本身的自定义 grid 列数
     layout_config?: {
         grid_template_areas?: string[];
         grid_template_columns?: string;
     };
     filter?: string;
     limit?: number;
+    pagination?: boolean;
+    page_size?: number;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
     render: WidgetConfig | WidgetConfig[];
@@ -176,7 +179,6 @@ export interface StatGridItem {
 export interface ViewItem {
     id: string;
     w: number;
-    h: number;
     source_id: string;
     template_id: string;
     props: Record<string, any>;

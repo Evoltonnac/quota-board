@@ -11,7 +11,6 @@ class ViewItem(BaseModel):
     """A single item in a View layout (widget)."""
     id: str = Field(default="", description="Unique identifier for layout engine")
     w: int = Field(default=4, description="Width in grid columns")
-    h: int = Field(default=4, description="Height in grid rows")
     source_id: str = Field(default="", description="Link to StoredSource")
     template_id: str = Field(default="", description="Link to Integration's templates")
     props: Dict[str, Any] = Field(default_factory=dict, description="Optional overrides for the template")

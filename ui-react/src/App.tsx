@@ -351,7 +351,6 @@ function Dashboard() {
         const newItem = {
             id: newItemId,
             w: 4,
-            h: 4,
             source_id: sourceId,
             template_id: template.label || template.type || "",
             props: { ...template },
@@ -381,11 +380,7 @@ function Dashboard() {
         }
     };
 
-    const handleUpdateWidgetSize = async (
-        index: number,
-        dw: number,
-        dh: number,
-    ) => {
+    const handleUpdateWidgetSize = async (index: number, dw: number) => {
         if (!viewConfig) return;
         const newItems = [...viewConfig.items];
         const item = newItems[index];
@@ -393,10 +388,9 @@ function Dashboard() {
             1,
             Math.min(viewConfig.layout_columns, item.w + dw),
         );
-        const newH = Math.max(1, item.h + dh);
-        if (newW === item.w && newH === item.h) return;
+        if (newW === item.w) return;
 
-        newItems[index] = { ...item, w: newW, h: newH };
+        newItems[index] = { ...item, w: newW };
         const updatedView = { ...viewConfig, items: newItems };
 
         // Optimistic
@@ -686,11 +680,10 @@ function Dashboard() {
                                             key={index}
                                             style={{
                                                 gridColumn: `span ${item.w}`,
-                                                gridRow: `span ${item.h}`,
                                                 display: "flex", // ensure children can fill
                                                 flexDirection: "column",
                                             }}
-                                            className={`min-h-0 relative ${isEditMode ? "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-xl" : ""}`}
+                                            className={`h-full min-h-0 relative ${isEditMode ? "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-xl" : ""}`}
                                         >
                                             <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col [&>div]:h-full [&>div]:flex-1">
                                                 {renderComponent(
@@ -762,7 +755,6 @@ function Dashboard() {
                                                                         handleUpdateWidgetSize(
                                                                             index,
                                                                             -1,
-                                                                            0,
                                                                         )
                                                                     }
                                                                     disabled={
@@ -780,51 +772,11 @@ function Dashboard() {
                                                                         handleUpdateWidgetSize(
                                                                             index,
                                                                             1,
-                                                                            0,
                                                                         )
                                                                     }
                                                                     disabled={
                                                                         item.w >=
                                                                         viewConfig.layout_columns
-                                                                    }
-                                                                >
-                                                                    <Plus className="h-3 w-3" />
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <span className="text-xs font-medium text-foreground">
-                                                                高度 ({item.h})
-                                                            </span>
-                                                            <div className="flex items-center gap-1">
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="outline"
-                                                                    className="h-6 w-6"
-                                                                    onClick={() =>
-                                                                        handleUpdateWidgetSize(
-                                                                            index,
-                                                                            0,
-                                                                            -1,
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        item.h <=
-                                                                        1
-                                                                    }
-                                                                >
-                                                                    <Minus className="h-3 w-3" />
-                                                                </Button>
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="outline"
-                                                                    className="h-6 w-6"
-                                                                    onClick={() =>
-                                                                        handleUpdateWidgetSize(
-                                                                            index,
-                                                                            0,
-                                                                            1,
-                                                                        )
                                                                     }
                                                                 >
                                                                     <Plus className="h-3 w-3" />

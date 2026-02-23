@@ -35,12 +35,17 @@ All fields within widget configurations that need to display dynamic data must u
 
 Widgets within a card or a list are arranged using predefined layouts. This is particularly useful for maximizing space and creating structured displays.
 
+> [!NOTE]
+> Height Auto-Sizing: The view layer is designed as a Masonry-style (waterfall) grid. There are no `row` or `height` properties you can configure for widgets. **All widget heights adapt automatically to their content.** To manage components that could grow indefinitely (like lists), use the `pagination` or `limit` features to control their height naturally.
+
 ### List Widget Layouts
 
-When rendering arrays of data using a `list` widget, you can define how items are arranged using the `layout` and `layout_config` properties.
+When rendering arrays of data using a `list` widget, you can define how items are arranged using the `layout` property:
 
 1.  **Row / Column (`layout: "row"` or `layout: "col"`)**: Arranges items sequentially horizontally or vertically.
-2.  **Grid Layout (`layout: "grid"`)**: Automatically arranges list items into a responsive grid (1 column on mobile, 2 on tablet, 3 on desktop).
+2.  **Grid Layout (`layout: "grid"`)**: Automatically arranges list items into a grid.
+    *   By default, it uses a responsive grid (1 column on mobile, 2 on tablet, 3 on desktop) which perfectly handles dynamic quantities of elements.
+    *   You can also specify an exact number of columns using the `columns` property (e.g., `columns: 4`), which overrides the responsive default.
 
 ### Internal Item Grid Config (`grid_template_areas`)
 
@@ -76,7 +81,7 @@ The `list` widget allows you to iterate over an array of data from your integrat
 *   `item_alias`: The variable name used to reference a single item within the loop (e.g., `"key_item"`).
 *   `render`: A single widget or a list of widgets to render for *each* item in the array. Note how the `render` block uses `item_alias` (e.g., `{key_item.usage}`) in its templates.
 
-### Filtering and Sorting
+### Filtering, Sorting & Pagination
 
 You can dynamically manipulate the list before rendering without changing the raw data:
 
@@ -84,6 +89,11 @@ You can dynamically manipulate the list before rendering without changing the ra
 *   **`sort_by`**: The data path to sort the array by. Example: `"key_item.usage"`.
 *   **`sort_order`**: `"asc"` (ascending) or `"desc"` (descending).
 *   **`limit`**: An integer to restrict the maximum number of items shown.
+
+**Pagination Config:**
+Instead of a hard `limit`, you can enable interactive pagination to handle large lists gracefully:
+*   **`pagination`**: Set to `true` to render pagination controls (Previous/Next) at the bottom of the list.
+*   **`page_size`**: The number of items to display per page (defaults to 5). Note: If `pagination` is enabled, `limit` will be ignored.
 
 ## Available Micro-Widgets
 

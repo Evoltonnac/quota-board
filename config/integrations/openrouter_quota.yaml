@@ -74,7 +74,11 @@ integrations:
                 - type: "list"
                   data_source: "keys_list"
                   item_alias: "key_item"
-                  layout: "col"
+                  layout: "grid"
+                  columns: 2
+                  pagination: true
+                  page_size: 4
+
                   # Example filter: only show keys with active limits (can be expanded later)
                   # limit: 5    # uncomment to limit items
                   # sort_by: "key_item.usage"
