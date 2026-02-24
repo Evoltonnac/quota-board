@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { api } from "./api/client";
 import type {
     StoredView,
@@ -38,6 +40,14 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "./components/ui/dropdown-menu";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "./components/ui/dialog";
 import {
     Tooltip,
     TooltipContent,
@@ -292,6 +302,11 @@ function Dashboard() {
     // Add Widget Dialog State
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
+    // Delete Source Dialog State
+    const [deletingSourceId, setDeletingSourceId] = useState<string | null>(
+        null,
+    );
+
     // Edit Layout State
     const [isEditMode, setIsEditMode] = useState(false);
 
@@ -441,12 +456,111 @@ function Dashboard() {
         loadData();
     }, []);
 
+    // Monitor for background scraper tasks
+    useEffect(() => {
+        sources.forEach((source) => {
+            if (
+                source.status === "suspended" &&
+                source.interaction?.type === "webview_scrape"
+            ) {
+                const { url, script, intercept_api, secret_key } =
+                    source.interaction.data || {};
+
+                // Dispatch silently to Tauri Backend
+                invoke("push_scraper_task", {
+                    sourceId: source.id,
+                    url: url,
+                    injectScript: script,
+                    interceptApi: intercept_api,
+                    secretKey: secret_key,
+                }).catch((err) => {
+                    console.error("Failed to push scraper task to Tauri:", err);
+                });
+            }
+        });
+    }, [sources]);
+
+    // Setup global listeners from Tauri
+    useEffect(() => {
+        let unlistenScraperResult: (() => void) | undefined;
+        let unlistenAuthRequired: (() => void) | undefined;
+
+        listen<{
+            sourceId: string;
+            data: any;
+            error?: string;
+            secretKey: string;
+        }>("scraper_result", async (event) => {
+            const { sourceId, data, error, secretKey } = event.payload;
+            if (error) {
+                console.error(`Scraper error for ${sourceId}:`, error);
+                return;
+            }
+            try {
+                // Send scraped data back to Python Core
+                await api.interact(sourceId, { [secretKey]: data });
+                // Python will resume the flow. We wait a bit then reload to see results.
+                setTimeout(loadData, 2000);
+            } catch (err) {
+                console.error(
+                    `Failed to post scraped data for ${sourceId}:`,
+                    err,
+                );
+            }
+        }).then((unlisten) => {
+            unlistenScraperResult = unlisten;
+        });
+
+        listen<{ sourceId: string; targetUrl: string }>(
+            "scraper_auth_required",
+            (event) => {
+                console.log(
+                    `Manual auth required for source ${event.payload.sourceId}`,
+                );
+                // The Rust backend should show the Webview.
+                // We can perhaps pop up a notification here telling the user to log in on the opened window.
+            },
+        ).then((unlisten) => {
+            unlistenAuthRequired = unlisten;
+        });
+
+        return () => {
+            if (unlistenScraperResult) unlistenScraperResult();
+            if (unlistenAuthRequired) unlistenAuthRequired();
+        };
+    }, []);
+
     const handleRefreshAll = async () => {
         try {
             await api.refreshAll();
             setTimeout(loadData, 2000);
         } catch (error) {
             console.error("刷新失败:", error);
+        }
+    };
+
+    const handleRefreshSource = async (sourceId: string) => {
+        // Optimistic feedback
+        setSources((prev) =>
+            prev.map((s) =>
+                s.id === sourceId ? { ...s, status: "refreshing" as any } : s,
+            ),
+        );
+        try {
+            await api.refreshSource(sourceId);
+            setTimeout(loadData, 2000);
+        } catch (error) {
+            console.error(`刷新数据源 ${sourceId} 失败:`, error);
+        }
+    };
+
+    const handleDeleteSource = async (sourceId: string) => {
+        try {
+            await api.deleteSourceFile(sourceId);
+            setDeletingSourceId(null);
+            setTimeout(loadData, 500);
+        } catch (error) {
+            console.error(`删除数据源 ${sourceId} 失败:`, error);
         }
     };
 
@@ -551,27 +665,76 @@ function Dashboard() {
                                 >
                                     <CardContent className="p-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="font-medium text-sm truncate">
-                                                {source.name}
-                                            </span>
-                                            <Badge
-                                                variant={
-                                                    source.has_data
-                                                        ? "success"
-                                                        : source.error
-                                                          ? "destructive"
-                                                          : "secondary"
-                                                }
-                                            >
-                                                {source.has_data
-                                                    ? "正常"
-                                                    : source.error
-                                                      ? "错误"
-                                                      : source.status ===
-                                                          "suspended"
-                                                        ? "需操作"
-                                                        : "等待"}
-                                            </Badge>
+                                            <div className="flex items-center gap-2 overflow-hidden max-w-[120px]">
+                                                <span className="font-medium text-sm truncate">
+                                                    {source.name}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <Badge
+                                                    variant={
+                                                        (source.status as string) ===
+                                                        "refreshing"
+                                                            ? "default"
+                                                            : source.has_data
+                                                              ? "success"
+                                                              : source.error
+                                                                ? "destructive"
+                                                                : "secondary"
+                                                    }
+                                                >
+                                                    {(source.status as string) ===
+                                                    "refreshing"
+                                                        ? "刷新中"
+                                                        : source.has_data
+                                                          ? "正常"
+                                                          : source.error
+                                                            ? "错误"
+                                                            : (source.status as string) ===
+                                                                "suspended"
+                                                              ? "需操作"
+                                                              : "等待"}
+                                                </Badge>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger
+                                                        asChild
+                                                    >
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6"
+                                                        >
+                                                            <MoreVertical className="h-3 w-3" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem
+                                                            onSelect={(e) => {
+                                                                e.preventDefault();
+                                                                handleRefreshSource(
+                                                                    source.id,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <RefreshCw className="mr-2 h-4 w-4" />
+                                                            刷新
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            onSelect={(e) => {
+                                                                e.preventDefault();
+                                                                setDeletingSourceId(
+                                                                    source.id,
+                                                                );
+                                                            }}
+                                                            className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            删除
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
                                         </div>
                                         {source.status === "suspended" && (
                                             <Button
@@ -608,6 +771,41 @@ function Dashboard() {
                                 </Card>
                             ))}
                         </div>
+
+                        <Dialog
+                            open={deletingSourceId !== null}
+                            onOpenChange={(open) =>
+                                !open && setDeletingSourceId(null)
+                            }
+                        >
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>确认删除</DialogTitle>
+                                    <DialogDescription>
+                                        确定要删除此数据源吗？相关配置和本地数据也将被清除，此操作不可撤销。
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            setDeletingSourceId(null)
+                                        }
+                                    >
+                                        取消
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() =>
+                                            deletingSourceId &&
+                                            handleDeleteSource(deletingSourceId)
+                                        }
+                                    >
+                                        确认删除
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </aside>
 
                     {/* Main Content */}

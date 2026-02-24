@@ -223,6 +223,18 @@ export function FlowHandler({
                     </div>
                 );
 
+            case "webview_scrape":
+                return (
+                    <div className="py-8 flex flex-col items-center justify-center space-y-4">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <div className="text-sm text-muted-foreground text-center">
+                            Executing secure background data extraction...
+                            <br />
+                            Please wait.
+                        </div>
+                    </div>
+                );
+
             default:
                 return (
                     <div className="py-4 text-red-500">

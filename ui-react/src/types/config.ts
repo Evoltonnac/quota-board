@@ -130,6 +130,8 @@ export interface StepConfig {
     use: StepType;
     args: Record<string, any>;
     outputs: Record<string, string>;
+    context?: Record<string, string>;
+    secrets?: Record<string, string>;
 }
 
 // Extended ViewComponent with more properties
@@ -211,7 +213,7 @@ export interface SourceSummary {
 }
 
 export type SourceStatus = 'active' | 'error' | 'suspended' | 'disabled';
-export type InteractionType = 'input_text' | 'oauth_start' | 'captcha' | 'confirm';
+export type InteractionType = 'input_text' | 'oauth_start' | 'captcha' | 'confirm' | 'webview_scrape';
 
 export interface InteractionField {
     key: string;
