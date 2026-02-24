@@ -1,9 +1,16 @@
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 
+pub mod scraper;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            scraper::push_scraper_task,
+            scraper::handle_scraped_data,
+            scraper::handle_scraper_auth
+        ])
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
