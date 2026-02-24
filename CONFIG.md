@@ -121,7 +121,7 @@ Flow 执行引擎支持三种变量类型，并按优先级检索：
 
 #### secrets - 密钥存储
 
-用于长期存储敏感信息（如 Token）。需要在步骤中显式声明 `secrets` 字段才会存储：
+用于长期存储敏感信息（如 Token）。需要在步骤中显式声明 `secrets` 字段（以键值对形式）才会存储：
 
 ```yaml
 - id: oauth_auth
@@ -132,7 +132,7 @@ Flow 执行引擎支持三种变量类型，并按优先级检索：
   outputs:
     access_token: "access_token"
   secrets:
-    - access_token  # 显式声明：将 access_token 存储到 SecretsController
+    access_token: "access_token"  # 显式声明：将步骤内部变量 access_token 存储为密钥名称 access_token 到 SecretsController
 ```
 
 > **注意**：Flow 模式移除了隐式的 Authorization 头注入和隐式的 secrets 存储。必须在步骤中显式定义 `headers` 和 `secrets`。
@@ -149,15 +149,13 @@ integrations:
       # Step 1: Authentication (Get API Key)
       - id: auth
         use: api_key
+        secrets:
+          api_key: "access_token" # 显式存储 api_key 到 SecretsController
         args:
-          secret_key: "api_key"
           label: "Management API Key"
           description: "Input your OpenRouter Management API Key"
         outputs:
-          access_token: "access_token"
-        # 显式存储 access_token 到 SecretsController
-        secrets:
-          - access_token
+          api_key: "access_token"
 
       # Step 2: Fetch Keys List (with explicit Authorization header)
       - id: fetch
@@ -199,12 +197,13 @@ integrations:
 
 用于获取用户输入的 API Key。
 
+- `secrets`:
+  - `api_key`: string (必填，保存的密钥名称ID)
 - `args`:
-  - `secret_key`: string (必填，密钥ID)
   - `label`: string (前端显示的标签)
   - `description`: string (可选，描述信息)
 - `outputs`:
-  - `access_token`: 将密钥值保存到变量
+  - `api_key`: 将密钥值暴露给后续步骤
 
 ### `http` - 发送 HTTP 请求
 
