@@ -1,0 +1,47 @@
+integrations:
+    - id: soniox_dashboard_webview
+      name: "Soniox Dashboard (WebView)"
+      description: "静默从后台获取 Soniox 仪表板账单数据，无需复制 Token 或抓包，更安全稳定。"
+
+      flow:
+          # 直接使用 webview 拦截器，无需人工介入
+          - id: webview_fetch
+            use: webview
+            args:
+                url: "https://console.soniox.com/"
+                intercept_api: "/dashboard/"
+                script: "" # 使用内置的静态资源阻断和拦截器即可
+            outputs:
+                webview_data: "dashboard_response"
+
+          - id: parse_billing
+            use: extract
+            args:
+                source: "{dashboard_response}"
+                type: "jsonpath"
+                expr: "$.billing.available_balance_usd"
+            outputs:
+                available_balance: "available_balance"
+
+          - id: parse_usage
+            use: extract
+            args:
+                source: "{dashboard_response}"
+                type: "jsonpath"
+                expr: "$.mtd_usage.total_paid_amount_usd"
+            outputs:
+                total_usage: "total_usage"
+
+      templates:
+          - label: "Soniox Quota (WebView Mode)"
+            type: "source_card"
+            ui:
+                title: "Soniox"
+                icon: "🎙️"
+            widgets:
+                - type: "hero_metric"
+                  amount: "{available_balance}"
+                  currency: "USD"
+                - type: "key_value_grid"
+                  items:
+                      "Month Usage": "${total_usage}"

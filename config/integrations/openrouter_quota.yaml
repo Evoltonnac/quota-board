@@ -8,9 +8,10 @@ integrations:
           - id: auth
             use: api_key
             args:
-                secret_key: "access_token"
                 label: "Management API Key"
                 description: "Input your OpenRouter Management API Key"
+            secrets:
+                api_key: "access_token"
 
           # Step 2: Fetch Keys List (with explicit Authorization header)
           - id: fetch
@@ -20,7 +21,7 @@ integrations:
                 method: "GET"
                 headers:
                     Authorization: "Bearer {access_token}"
-            outputs:
+            context:
                 http_response: "http_response"
 
           # Step 3: Extract Data
@@ -40,7 +41,7 @@ integrations:
                 method: "GET"
                 headers:
                     Authorization: "Bearer {access_token}"
-            outputs:
+            context:
                 http_response: "credits_response"
 
           # Step 5: Extract Credits Data
