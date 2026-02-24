@@ -131,6 +131,8 @@ class Executor:
         # Initial context with source vars
         context.update(source.vars)
 
+        final_data = {}
+
         for step in source.flow:
             logger.info(f"[{source.id}] Running step {step.id} ({step.use})")
 
@@ -145,8 +147,7 @@ class Executor:
 
                 if step.use == StepType.API_KEY:
                      # Get API Key from secrets
-                     secret_key = args.get("secret_key", "api_key") # Default key name in secrets
-                     output_var = list(step.outputs.values())[0] if step.outputs else "access_token"
+                     secret_key = step.secrets.get("api_key", "api_key") if step.secrets else "api_key"
 
                      api_key = self._secrets.get_secret(source.id, secret_key)
 
@@ -167,10 +168,10 @@ class Executor:
                          )
 
                      # Output into outputs (single step variable)
-                     output = {list(step.outputs.keys())[0]: api_key} if step.outputs else {"access_token": api_key}
+                     output = {"api_key": api_key}
 
                 elif step.use == StepType.CURL:
-                     secret_key = args.get("secret_key", "curl_command")
+                     secret_key = step.secrets.get("curl_command", "curl_command") if step.secrets else "curl_command"
                      curl_command = self._secrets.get_secret(source.id, secret_key)
                      
                      if not curl_command:
@@ -202,15 +203,14 @@ class Executor:
                      except Exception as e:
                          logger.error(f"Failed to parse cURL command for step {step.id}: {e}")
                          
-                     output = {}
-                     for key, var_name in step.outputs.items():
-                         if key == "headers":
-                             output[key] = extracted_headers
-                         else:
-                             # search case-insensitively just in case
-                             val = next((v for k, v in extracted_headers.items() if k.lower() == key.lower()), None)
-                             if val is not None:
-                                 output[key] = val
+                     output = {"curl_command": curl_command, "headers": extracted_headers}
+                     if step.outputs:
+                         for key, var_name in step.outputs.items():
+                             if key != "headers" and key != "curl_command":
+                                 # search case-insensitively just in case
+                                 val = next((v for k, v in extracted_headers.items() if k.lower() == key.lower()), None)
+                                 if val is not None:
+                                     output[key] = val
 
                 elif step.use == StepType.OAUTH:
                      # OAuth token always stored under source.id
@@ -313,30 +313,68 @@ class Executor:
                              output = {}
 
                 elif step.use == StepType.SCRIPT:
-                     # Execute provided Python code
-                     script_code = args.get("code")
-                     if not script_code:
-                         raise ValueError(f"Step {step.id} has use=script but no 'code' argument provided.")
-                     
-                     # Provide context as locals
-                     local_env = {**context, **outputs}
-                     
-                     # Redirect stdout to capture if needed, though usually we expect output via variables
-                     # We'll expect the script to either modify local_env or set variables we extract
-                     try:
-                         # Use compile and exec to run the script
-                         compiled = compile(script_code, f"<step_{step.id}>", "exec")
-                         exec(compiled, {}, local_env)
-                         
-                         # Any defined outputs in step config will be extracted from local_env
-                         output = {}
-                         if step.outputs:
-                             for key, var_name in step.outputs.items():
-                                 if key in local_env:
-                                     output[key] = local_env[key]
-                     except Exception as script_e:
-                         logger.error(f"Error executing script in step {step.id}:\n{script_code}")
-                         raise script_e
+                    # Execute provided Python code
+                    script_code = args.get("code")
+                    if not script_code:
+                        raise ValueError(f"Step {step.id} has use=script but no 'code' argument provided.")
+                    
+                    # Provide context as locals
+                    local_env = {**context, **outputs}
+                    
+                    # Redirect stdout to capture if needed, though usually we expect output via variables
+                    # We'll expect the script to either modify local_env or set variables we extract
+                    try:
+                        # Use compile and exec to run the script
+                        compiled = compile(script_code, f"<step_{step.id}>", "exec")
+                        exec(compiled, {}, local_env)
+                        
+                        # Any defined outputs in step config will be extracted from local_env
+                        output = {}
+                        if step.outputs:
+                            for key, var_name in step.outputs.items():
+                                if key in local_env:
+                                    output[key] = local_env[key]
+                        if getattr(step, 'context', None):
+                            for key, var_name in step.context.items():
+                                if key in local_env:
+                                    output[key] = local_env[key]
+                    except Exception as script_e:
+                        logger.error(f"Error executing script in step {step.id}:\n{script_code}")
+                        raise script_e
+
+                elif step.use == StepType.WEBVIEW:
+                    secret_key = step.secrets.get("webview_data", "webview_data") if step.secrets else "webview_data"
+                    webview_data = self._secrets.get_secret(source.id, secret_key)
+                    
+                    if not webview_data:
+                        url = args.get("url")
+                        script = args.get("script")
+                        intercept_api = args.get("intercept_api")
+                        
+                        if not url:
+                            raise ValueError(f"Step {step.id} has use=webview but no 'url' argument provided.")
+                        
+                        raise RequiredSecretMissing(
+                            source_id=source.id,
+                            interaction_type=InteractionType.WEBVIEW_SCRAPE,
+                            fields=[],
+                            message=f"System background scraping required for {source.id}",
+                            data={
+                                "url": url,
+                                "script": script,
+                                "intercept_api": intercept_api,
+                                "secret_key": secret_key
+                            }
+                        )
+                    
+                    output = {"webview_data": webview_data}
+                    if isinstance(webview_data, dict):
+                        for k, v in webview_data.items():
+                            output[k] = v
+
+                    # Clear webview data from secrets immediately so that
+                    # the next fetch (e.g. manual refresh) will prompt a new webview scrape
+                    self._secrets.delete_secret(source.id, secret_key)
 
                 # Process outputs
                 if output and step.outputs:
@@ -344,13 +382,21 @@ class Executor:
                         if key in output:
                             # Store in outputs (single step variable)
                             outputs[var_name] = output[key]
+                            # Store in final_data to be saved to data.json
+                            final_data[var_name] = output[key]
+
+                # Process context
+                if output and getattr(step, 'context', None):
+                    for key, var_name in step.context.items():
+                        if key in output:
+                            outputs[var_name] = output[key]
 
                 # Explicitly store secrets if specified in step config
                 if step.secrets and output:
-                    for secret_key in step.secrets:
-                        if secret_key in output:
-                            self._secrets.set_secret(source.id, secret_key, output[secret_key])
-                            logger.info(f"[{source.id}] Stored secret '{secret_key}' from step {step.id}")
+                    for key, secret_name in step.secrets.items():
+                        if key in output:
+                            self._secrets.set_secret(source.id, secret_name, output[key])
+                            logger.info(f"[{source.id}] Stored secret '{secret_name}' from step {step.id}")
 
                 # Update context with outputs (promote to global context)
                 if outputs:
@@ -360,8 +406,8 @@ class Executor:
                 logger.error(f"Step {step.id} failed: {step_error}")
                 raise step_error
 
-        # Return final context
-        return context
+        # Return final data mapping
+        return final_data
 
     def _resolve_args(self, args: Dict[str, Any], outputs: Dict[str, Any], context: Dict[str, Any], source_id: str) -> Dict[str, Any]:
         """Recursive string substitution with priority: outputs > context > secrets.

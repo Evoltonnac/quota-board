@@ -90,7 +90,8 @@ class SecretsController:
 
     def delete_secret(self, secret_id: str, key: str):
         """删除指定 secret_id 下的单个 secret。"""
-        secrets = self.get_secrets(secret_id)
-        if key in secrets:
-            del secrets[key]
-            self.set_secrets(secret_id, secrets)
+        all_secrets = self._load_all()
+        if secret_id in all_secrets and key in all_secrets[secret_id]:
+            del all_secrets[secret_id][key]
+            self._save_all(all_secrets)
+            logger.debug(f"Secret '{key}' 已删除: {secret_id}")

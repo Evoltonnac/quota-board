@@ -138,6 +138,7 @@ class StepType(str, Enum):
     EXTRACT = "extract"
     SCRIPT = "script"
     LOG = "log"
+    WEBVIEW = "webview"
 
 class StepConfig(BaseModel):
     id: str
@@ -145,8 +146,9 @@ class StepConfig(BaseModel):
     use: StepType
     args: Dict[str, Any] = Field(default_factory=dict)
     outputs: Dict[str, str] = Field(default_factory=dict)
-    # Explicit list of output keys to store in SecretsController
-    secrets: Optional[List[str]] = None
+    context: Dict[str, str] = Field(default_factory=dict)
+    # Explicit map of internal outputs keys to store as secret names in SecretsController
+    secrets: Dict[str, str] = Field(default_factory=dict)
 
 
 # ── 视图组件配置 ──────────────────────────────────────

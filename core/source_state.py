@@ -24,6 +24,7 @@ class InteractionType(str, Enum):
     CAPTCHA = "captcha"
     CONFIRM = "confirm"
     RETRY = "retry" # 简单的重试按钮
+    WEBVIEW_SCRAPE = "webview_scrape" # 静默 Webview 采集
 
 
 class InteractionField(BaseModel):
