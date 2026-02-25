@@ -174,6 +174,8 @@ async def refresh_source(source_id: str, background_tasks: BackgroundTasks) -> d
     if source is None:
         raise HTTPException(404, f"数据源 '{source_id}' 不存在")
 
+    # 同步更新状态为正在刷新，防止前端立即请求 loadData 时读到旧状态
+    _executor._update_state(source_id, SourceStatus.REFRESHING, "Fetching latest data...")
     background_tasks.add_task(_executor.fetch_source, source)
     return {"message": f"已触发刷新: {source.name}", "source_id": source_id}
 
@@ -188,6 +190,8 @@ async def refresh_all(background_tasks: BackgroundTasks) -> dict:
     for stored in stored_sources:
         resolved = _resolve_stored_source(stored)
         if resolved:
+            # 同步更新状态为正在刷新
+            _executor._update_state(stored.id, SourceStatus.REFRESHING, "Refreshing all sources...")
             background_tasks.add_task(_executor.fetch_source, resolved)
             source_ids.append(stored.id)
 
@@ -302,6 +306,8 @@ async def interact_source(source_id: str, data: dict[str, Any], background_tasks
         _secrets.set_secrets(target_source_id, data)
         logger.info(f"[{source_id}] Received interaction data for source '{target_source_id}'.")
     
+    # 同步更新状态为正在刷新
+    _executor._update_state(source_id, SourceStatus.REFRESHING, "Processing interaction results...")
     # Trigger retry/resume
     # fetch_source handles "resume" by just running again and hopefully succeeding this time
     background_tasks.add_task(_executor.fetch_source, source)

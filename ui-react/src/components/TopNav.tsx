@@ -1,111 +1,107 @@
 import { Link, NavLink } from "react-router-dom";
 import { api } from "../api/client";
 import {
-    Activity,
-    RefreshCw,
-    Settings,
-    LayoutDashboard,
-    Blocks,
+  Activity,
+  RefreshCw,
+  Settings,
+  LayoutDashboard,
+  Blocks,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from "./ui/tooltip";
 
 export function TopNav() {
-    // In a real application, you might want a global state or context to manage loading states
-    // Here we'll just dispatch the backend refresh and trigger a window event for active pages to listen to.
-    const handleRefreshAll = async () => {
-        try {
-            await api.refreshAll();
-            // Emit custom event to notify current page to reload its data
-            window.dispatchEvent(new CustomEvent("app:refresh_data"));
-        } catch (error) {
-            console.error("刷新失败:", error);
-        }
-    };
+  // In a real application, you might want a global state or context to manage loading states
+  // Here we'll just dispatch the backend refresh and trigger a window event for active pages to listen to.
+  const handleRefreshAll = async () => {
+    try {
+      await api.refreshAll();
+      // Emit custom event to notify current page to reload its data
+      window.dispatchEvent(new CustomEvent("app:refresh_data"));
+    } catch (error) {
+      console.error("刷新失败:", error);
+    }
+  };
 
-    return (
-        <header className="flex-shrink-0 border-b border-border px-6 py-3 bg-card/50 backdrop-blur-sm z-50">
-            <div className="flex items-center justify-between">
-                {/* Left: Brand */}
-                <div className="flex items-center gap-6">
-                    <Link to="/" className="flex items-center gap-3 mr-4">
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                            <Activity className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-lg font-bold leading-none tracking-tight">
-                                Quota Board
-                            </h1>
-                            <p className="text-[10px] text-muted-foreground mt-1">
-                                资源总览
-                            </p>
-                        </div>
-                    </Link>
-
-                    {/* Middle: Navigation Tabs */}
-                    <nav className="hidden md:flex items-center space-x-1">
-                        <NavLink
-                            to="/"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                                    isActive
-                                        ? "bg-secondary text-secondary-foreground"
-                                        : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                                }`
-                            }
-                        >
-                            <LayoutDashboard className="w-4 h-4" />
-                            全部看板
-                        </NavLink>
-                        <NavLink
-                            to="/integrations"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                                    isActive
-                                        ? "bg-secondary text-secondary-foreground"
-                                        : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                                }`
-                            }
-                        >
-                            <Blocks className="w-4 h-4" />
-                            集成管理
-                        </NavLink>
-                    </nav>
-                </div>
-
-                {/* Right: Actions */}
-                <div className="flex items-center gap-3">
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleRefreshAll}
-                                    className="h-9"
-                                >
-                                    <RefreshCw className="w-4 h-4 md:mr-2" />
-                                    <span className="hidden md:inline">
-                                        全部刷新
-                                    </span>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>重新获取所有数据源的配额数据</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-
-                    <Button variant="ghost" size="icon" className="h-9 w-9">
-                        <Settings className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                </div>
+  return (
+    <header className="flex-shrink-0 border-b border-border px-6 py-3 bg-card/50 backdrop-blur-sm z-50">
+      <div className="flex items-center justify-between">
+        {/* Left: Brand */}
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-3 mr-4">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Activity className="w-5 h-5 text-primary" />
             </div>
-        </header>
-    );
+            <div>
+              <h1 className="text-lg font-bold leading-none tracking-tight">
+                Quota Board
+              </h1>
+              <p className="text-[10px] text-muted-foreground mt-1">资源总览</p>
+            </div>
+          </Link>
+
+          {/* Middle: Navigation Tabs */}
+          <nav className="hidden md:flex items-center space-x-1">
+            <NavLink
+              to="/"
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-secondary text-secondary-foreground"
+                    : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                }`
+              }
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              全部看板
+            </NavLink>
+            <NavLink
+              to="/integrations"
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-secondary text-secondary-foreground"
+                    : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                }`
+              }
+            >
+              <Blocks className="w-4 h-4" />
+              集成管理
+            </NavLink>
+          </nav>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-3">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefreshAll}
+                  className="h-9"
+                >
+                  <RefreshCw className="w-4 h-4 md:mr-2" />
+                  <span className="hidden md:inline">全部刷新</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>重新获取所有数据源的配额数据</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Settings className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </div>
+      </div>
+    </header>
+  );
 }

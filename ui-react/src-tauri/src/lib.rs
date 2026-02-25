@@ -6,10 +6,14 @@ pub mod scraper;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(scraper::ScraperState::default())
         .invoke_handler(tauri::generate_handler![
             scraper::push_scraper_task,
             scraper::handle_scraped_data,
-            scraper::handle_scraper_auth
+            scraper::handle_scraper_auth,
+            scraper::show_scraper_window,
+            scraper::cancel_scraper_task,
+            scraper::scraper_log
         ])
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {

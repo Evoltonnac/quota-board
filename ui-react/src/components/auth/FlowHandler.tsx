@@ -18,6 +18,7 @@ interface FlowHandlerProps {
     isOpen: boolean;
     onClose: () => void;
     onInteractSuccess?: () => void;
+    onPushToQueue?: (source: SourceSummary) => boolean; // returns false if already in queue
 }
 
 export function FlowHandler({
@@ -25,6 +26,7 @@ export function FlowHandler({
     isOpen,
     onClose,
     onInteractSuccess,
+    onPushToQueue,
 }: FlowHandlerProps) {
     const [formData, setFormData] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(false);
@@ -225,13 +227,31 @@ export function FlowHandler({
 
             case "webview_scrape":
                 return (
-                    <div className="py-8 flex flex-col items-center justify-center space-y-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                        <div className="text-sm text-muted-foreground text-center">
-                            Executing secure background data extraction...
-                            <br />
-                            Please wait.
+                    <div className="py-6 flex flex-col items-center justify-center space-y-4">
+                        <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+                            <ExternalLink className="w-6 h-6 text-blue-500" />
                         </div>
+                        <div className="text-sm text-muted-foreground text-center">
+                            <p className="font-medium text-foreground mb-1">
+                                网页数据抓取
+                            </p>
+                            <p>点击下方按钮将此任务加入后台抓取队列。</p>
+                            <p className="mt-1">
+                                任务会在后台自动执行，完成后数据将自动更新。
+                            </p>
+                        </div>
+                        <Button
+                            onClick={() => {
+                                if (!source || !onPushToQueue) return;
+                                const added = onPushToQueue(source);
+                                if (added) {
+                                    onClose();
+                                }
+                            }}
+                            className="w-full"
+                        >
+                            加入抓取队列
+                        </Button>
                     </div>
                 );
 
@@ -276,14 +296,16 @@ export function FlowHandler({
                 {renderContent()}
 
                 <DialogFooter>
-                    {interaction.type !== "oauth_start" && (
-                        <Button onClick={handleSubmit} disabled={loading}>
-                            {loading ? "Submitting..." : "Submit"}
-                        </Button>
-                    )}
-                    {interaction.type === "oauth_start" && (
+                    {interaction.type !== "oauth_start" &&
+                        interaction.type !== "webview_scrape" && (
+                            <Button onClick={handleSubmit} disabled={loading}>
+                                {loading ? "Submitting..." : "Submit"}
+                            </Button>
+                        )}
+                    {(interaction.type === "oauth_start" ||
+                        interaction.type === "webview_scrape") && (
                         <Button variant="outline" onClick={onClose}>
-                            Close
+                            关闭
                         </Button>
                     )}
                 </DialogFooter>

@@ -1,23 +1,23 @@
 // TypeScript 类型定义，镜像 Python Pydantic 模型
 
-export type AuthType = 'api_key' | 'browser' | 'oauth' | 'none';
-export type ParserType = 'jsonpath' | 'css' | 'regex' | 'script';
-export type HttpMethod = 'GET' | 'POST';
+export type AuthType = "api_key" | "browser" | "oauth" | "none";
+export type ParserType = "jsonpath" | "css" | "regex" | "script";
+export type HttpMethod = "GET" | "POST";
 
 // Extended component types for high information density
 export type ViewComponentType =
-    | 'metric'
-    | 'line_chart'
-    | 'bar_chart'
-    | 'table'
-    | 'json'
-    | 'quota_card'
-    | 'progress_bar'
-    | 'stat_grid'
-    | 'badge'
-    | 'mini_chart'
-    | 'source_card';
-export type ViewLayoutType = 'columns' | 'tabs';
+    | "metric"
+    | "line_chart"
+    | "bar_chart"
+    | "table"
+    | "json"
+    | "quota_card"
+    | "progress_bar"
+    | "stat_grid"
+    | "badge"
+    | "mini_chart"
+    | "source_card";
+export type ViewLayoutType = "columns" | "tabs";
 
 export interface FieldMapping {
     name: string;
@@ -30,7 +30,7 @@ export interface WidgetConfigBase {
 }
 
 export interface HeroMetricWidget extends WidgetConfigBase {
-    type: 'hero_metric';
+    type: "hero_metric";
     amount: string;
     currency?: string;
     prefix?: string;
@@ -38,12 +38,12 @@ export interface HeroMetricWidget extends WidgetConfigBase {
 }
 
 export interface KeyValueGridWidget extends WidgetConfigBase {
-    type: 'key_value_grid';
+    type: "key_value_grid";
     items: Record<string, string>;
 }
 
 export interface QuotaBarWidget extends WidgetConfigBase {
-    type: 'quota_bar';
+    type: "quota_bar";
     title?: string;
     usage: string;
     limit: string;
@@ -54,10 +54,10 @@ export interface QuotaBarWidget extends WidgetConfigBase {
 }
 
 export interface ListWidgetConfig extends WidgetConfigBase {
-    type: 'list';
+    type: "list";
     data_source: string;
     item_alias?: string;
-    layout?: 'col' | 'row' | 'grid';
+    layout?: "col" | "row" | "grid";
     columns?: number; // 用于 list 本身的自定义 grid 列数
     layout_config?: {
         grid_template_areas?: string[];
@@ -68,11 +68,15 @@ export interface ListWidgetConfig extends WidgetConfigBase {
     pagination?: boolean;
     page_size?: number;
     sort_by?: string;
-    sort_order?: 'asc' | 'desc';
+    sort_order?: "asc" | "desc";
     render: WidgetConfig | WidgetConfig[];
 }
 
-export type WidgetConfig = HeroMetricWidget | KeyValueGridWidget | QuotaBarWidget | ListWidgetConfig;
+export type WidgetConfig =
+    | HeroMetricWidget
+    | KeyValueGridWidget
+    | QuotaBarWidget
+    | ListWidgetConfig;
 
 export interface ParserConfig {
     type: ParserType;
@@ -122,7 +126,7 @@ export interface SourceConfig {
     flow?: StepConfig[];
 }
 
-export type StepType = 'http' | 'oauth' | 'extract' | 'script' | 'log';
+export type StepType = "http" | "oauth" | "extract" | "script" | "log";
 
 export interface StepConfig {
     id: string;
@@ -212,8 +216,13 @@ export interface SourceSummary {
     interaction?: InteractionRequest;
 }
 
-export type SourceStatus = 'active' | 'error' | 'suspended' | 'disabled';
-export type InteractionType = 'input_text' | 'oauth_start' | 'captcha' | 'confirm' | 'webview_scrape';
+export type SourceStatus = "active" | "error" | "suspended" | "disabled" | "refreshing";
+export type InteractionType =
+    | "input_text"
+    | "oauth_start"
+    | "captcha"
+    | "confirm"
+    | "webview_scrape";
 
 export interface InteractionField {
     key: string;
@@ -258,6 +267,6 @@ export interface HistoryRecord {
 export interface AuthStatus {
     source_id: string;
     auth_type: string;
-    status: 'ok' | 'error' | 'missing' | 'expired';
+    status: "ok" | "error" | "missing" | "expired";
     message?: string;
 }

@@ -9,8 +9,8 @@ export function getFieldFromPath(obj: any, path: string): any {
   if (!obj || !path) return undefined;
 
   // Convert [0] to .0
-  const normalizedPath = path.replace(/\[(\d+)\]/g, '.$1');
-  const keys = normalizedPath.split('.');
+  const normalizedPath = path.replace(/\[(\d+)\]/g, ".$1");
+  const keys = normalizedPath.split(".");
 
   let current = obj;
   for (const key of keys) {
@@ -22,7 +22,7 @@ export function getFieldFromPath(obj: any, path: string): any {
 }
 
 export function evaluateTemplate(template: any, data: any): any {
-  if (typeof template !== 'string') return template;
+  if (typeof template !== "string") return template;
 
   // Check if the entire string is just one template variable
   const singleVarMatch = template.match(/^{(.+?)}$/);

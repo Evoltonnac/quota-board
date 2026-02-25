@@ -2,592 +2,512 @@ import { useEffect, useState, useCallback } from "react";
 import Editor from "@monaco-editor/react";
 import { api } from "../api/client";
 import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-    CardDescription,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
 } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "../components/ui/dialog";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from "../components/ui/tooltip";
 import {
-    Plus,
-    Trash2,
-    Save,
-    RefreshCw,
-    MoreVertical,
-    FileJson,
-    Database,
-    AlertCircle,
-    CheckCircle,
+  Plus,
+  Trash2,
+  Save,
+  RefreshCw,
+  MoreVertical,
+  FileJson,
+  Database,
+  AlertCircle,
+  CheckCircle,
 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 
 export default function IntegrationsPage() {
-    const [integrations, setIntegrations] = useState<string[]>([]);
-    const [selectedFile, setSelectedFile] = useState<string | null>(null);
-    const [content, setContent] = useState<string>("");
-    const [originalContent, setOriginalContent] = useState<string>("");
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
+  const [integrations, setIntegrations] = useState<string[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [content, setContent] = useState<string>("");
+  const [originalContent, setOriginalContent] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-    // Source management
-    const [sources, setSources] = useState<any[]>([]);
+  // Source management
+  const [sources, setSources] = useState<any[]>([]);
 
-    // Dialogs
-    const [showNewIntegrationDialog, setShowNewIntegrationDialog] =
-        useState(false);
-    const [showNewSourceDialog, setShowNewSourceDialog] = useState(false);
-    const [newFilename, setNewFilename] = useState("");
-    const [newSourceName, setNewSourceName] = useState("");
-    const [newSourceIntegration, setNewSourceIntegration] = useState("");
+  // Dialogs
+  const [showNewIntegrationDialog, setShowNewIntegrationDialog] =
+    useState(false);
+  const [showNewSourceDialog, setShowNewSourceDialog] = useState(false);
+  const [newFilename, setNewFilename] = useState("");
+  const [newSourceName, setNewSourceName] = useState("");
+  const [newSourceIntegration, setNewSourceIntegration] = useState("");
 
-    const loadIntegrations = useCallback(async () => {
-        try {
-            const files = await api.listIntegrationFiles();
-            setIntegrations(files);
-        } catch (err) {
-            console.error("Failed to load integrations:", err);
-        }
-    }, []);
+  const loadIntegrations = useCallback(async () => {
+    try {
+      const files = await api.listIntegrationFiles();
+      setIntegrations(files);
+    } catch (err) {
+      console.error("Failed to load integrations:", err);
+    }
+  }, []);
 
-    const loadIntegrationContent = async (filename: string) => {
-        try {
-            const data = await api.getIntegrationFile(filename);
-            setSelectedFile(filename);
-            setContent(data.content);
-            setOriginalContent(data.content);
-            setError(null);
+  const loadIntegrationContent = async (filename: string) => {
+    try {
+      const data = await api.getIntegrationFile(filename);
+      setSelectedFile(filename);
+      setContent(data.content);
+      setOriginalContent(data.content);
+      setError(null);
 
-            // Load related sources
-            const relatedSources = await api.getIntegrationSources(filename);
-            setSources(relatedSources);
-        } catch (err) {
-            setError(`Failed to load ${filename}`);
-            console.error(err);
-        }
+      // Load related sources
+      const relatedSources = await api.getIntegrationSources(filename);
+      setSources(relatedSources);
+    } catch (err) {
+      setError(`Failed to load ${filename}`);
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      await loadIntegrations();
     };
+    init();
+  }, [loadIntegrations]);
 
-    useEffect(() => {
-        const init = async () => {
-            await loadIntegrations();
-        };
-        init();
-    }, [loadIntegrations]);
+  const handleSave = async () => {
+    if (!selectedFile) return;
 
-    const handleSave = async () => {
-        if (!selectedFile) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
 
-        setSaving(true);
-        setError(null);
-        setSuccess(null);
+    try {
+      await api.saveIntegrationFile(selectedFile, content);
+      setOriginalContent(content);
+      setSuccess("Saved successfully!");
 
-        try {
-            await api.saveIntegrationFile(selectedFile, content);
-            setOriginalContent(content);
-            setSuccess("Saved successfully!");
+      // Trigger config reload
+      const result = await api.reloadConfig();
+      if (result.affected_sources.length > 0) {
+        setSuccess(
+          `Saved! Reloaded config. Affected sources: ${result.affected_sources.join(", ")}`,
+        );
+      }
 
-            // Trigger config reload
-            const result = await api.reloadConfig();
-            if (result.affected_sources.length > 0) {
-                setSuccess(
-                    `Saved! Reloaded config. Affected sources: ${result.affected_sources.join(", ")}`,
-                );
-            }
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-            setTimeout(() => setSuccess(null), 3000);
-        } catch (err: any) {
-            setError(err.message || "Failed to save");
-        } finally {
-            setSaving(false);
+  const handleCreateIntegration = async () => {
+    if (!newFilename) return;
+
+    try {
+      await api.createIntegrationFile(
+        newFilename.endsWith(".yaml") ? newFilename : `${newFilename}.yaml`,
+      );
+      await loadIntegrations();
+      setShowNewIntegrationDialog(false);
+      setNewFilename("");
+      // Load the newly created file
+      await loadIntegrationContent(
+        newFilename.endsWith(".yaml") ? newFilename : `${newFilename}.yaml`,
+      );
+    } catch (err: any) {
+      setError(err.message || "Failed to create integration");
+    }
+  };
+
+  const handleDeleteIntegration = async (filename: string) => {
+    if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
+
+    try {
+      await api.deleteIntegrationFile(filename);
+      await loadIntegrations();
+      if (selectedFile === filename) {
+        setSelectedFile(null);
+        setContent("");
+        setSources([]);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to delete integration");
+    }
+  };
+
+  const handleCreateSource = async () => {
+    if (!newSourceName) return;
+
+    try {
+      const integrationId = selectedFile
+        ? selectedFile.replace(".yaml", "")
+        : newSourceIntegration;
+
+      await api.createSourceFile({
+        name: newSourceName,
+        integration_id: integrationId,
+      });
+
+      if (selectedFile) {
+        const relatedSources = await api.getIntegrationSources(selectedFile);
+        setSources(relatedSources);
+      }
+      setShowNewSourceDialog(false);
+      setNewSourceName("");
+      setNewSourceIntegration("");
+
+      // Reload config
+      await api.reloadConfig();
+    } catch (err: any) {
+      setError(err.message || "Failed to create source");
+    }
+  };
+
+  const handleDeleteSource = async (sourceId: string) => {
+    if (!confirm(`Are you sure you want to delete source "${sourceId}"?`))
+      return;
+
+    try {
+      await api.deleteSourceFile(sourceId);
+      if (selectedFile) {
+        const relatedSources = await api.getIntegrationSources(selectedFile);
+        setSources(relatedSources);
+      }
+
+      // Reload config
+      await api.reloadConfig();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete source");
+    }
+  };
+
+  // Keyboard shortcut for save
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (selectedFile && content !== originalContent) {
+          handleSave();
         }
+      }
     };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedFile, content, originalContent]);
 
-    const handleCreateIntegration = async () => {
-        if (!newFilename) return;
-
-        try {
-            await api.createIntegrationFile(
-                newFilename.endsWith(".yaml")
-                    ? newFilename
-                    : `${newFilename}.yaml`,
-            );
-            await loadIntegrations();
-            setShowNewIntegrationDialog(false);
-            setNewFilename("");
-            // Load the newly created file
-            await loadIntegrationContent(
-                newFilename.endsWith(".yaml")
-                    ? newFilename
-                    : `${newFilename}.yaml`,
-            );
-        } catch (err: any) {
-            setError(err.message || "Failed to create integration");
-        }
-    };
-
-    const handleDeleteIntegration = async (filename: string) => {
-        if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
-
-        try {
-            await api.deleteIntegrationFile(filename);
-            await loadIntegrations();
-            if (selectedFile === filename) {
-                setSelectedFile(null);
-                setContent("");
-                setSources([]);
-            }
-        } catch (err: any) {
-            setError(err.message || "Failed to delete integration");
-        }
-    };
-
-    const handleCreateSource = async () => {
-        if (!newSourceName) return;
-
-        try {
-            const integrationId = selectedFile
-                ? selectedFile.replace(".yaml", "")
-                : newSourceIntegration;
-
-            await api.createSourceFile({
-                name: newSourceName,
-                integration_id: integrationId,
-            });
-
-            if (selectedFile) {
-                const relatedSources =
-                    await api.getIntegrationSources(selectedFile);
-                setSources(relatedSources);
-            }
-            setShowNewSourceDialog(false);
-            setNewSourceName("");
-            setNewSourceIntegration("");
-
-            // Reload config
-            await api.reloadConfig();
-        } catch (err: any) {
-            setError(err.message || "Failed to create source");
-        }
-    };
-
-    const handleDeleteSource = async (sourceId: string) => {
-        if (!confirm(`Are you sure you want to delete source "${sourceId}"?`))
-            return;
-
-        try {
-            await api.deleteSourceFile(sourceId);
-            if (selectedFile) {
-                const relatedSources =
-                    await api.getIntegrationSources(selectedFile);
-                setSources(relatedSources);
-            }
-
-            // Reload config
-            await api.reloadConfig();
-        } catch (err: any) {
-            setError(err.message || "Failed to delete source");
-        }
-    };
-
-    // Keyboard shortcut for save
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-                e.preventDefault();
-                if (selectedFile && content !== originalContent) {
-                    handleSave();
-                }
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [selectedFile, content, originalContent]);
-
-    return (
-        <TooltipProvider>
-            <div className="flex h-full bg-background text-foreground">
-                {/* Sidebar */}
-                <aside className="w-64 border-r border-border bg-card/30 flex flex-col">
-                    <div className="p-4 border-b border-border">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
-                                <FileJson className="w-4 h-4" />
-                                Integrations
-                            </h2>
-                            <Dialog
-                                open={showNewIntegrationDialog}
-                                onOpenChange={setShowNewIntegrationDialog}
-                            >
-                                <DialogTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>
-                                            New Integration
-                                        </DialogTitle>
-                                        <DialogDescription>
-                                            Create a new integration YAML file.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="py-4">
-                                        <Input
-                                            placeholder="filename.yaml"
-                                            value={newFilename}
-                                            onChange={(e) =>
-                                                setNewFilename(e.target.value)
-                                            }
-                                        />
-                                    </div>
-                                    <DialogFooter>
-                                        <Button
-                                            variant="outline"
-                                            onClick={() =>
-                                                setShowNewIntegrationDialog(
-                                                    false,
-                                                )
-                                            }
-                                        >
-                                            Cancel
-                                        </Button>
-                                        <Button
-                                            onClick={handleCreateIntegration}
-                                        >
-                                            Create
-                                        </Button>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-2">
-                        {integrations.map((file) => (
-                            <div
-                                key={file}
-                                className={`group flex items-center justify-between p-2 rounded-md cursor-pointer mb-1 ${
-                                    selectedFile === file
-                                        ? "bg-primary/10 text-primary"
-                                        : "hover:bg-secondary/50"
-                                }`}
-                                onClick={() => loadIntegrationContent(file)}
-                            >
-                                <span className="text-sm truncate">{file}</span>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <MoreVertical className="h-3 w-3" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem
-                                            className="text-destructive"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteIntegration(file);
-                                            }}
-                                        >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Delete
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        ))}
-                        {integrations.length === 0 && (
-                            <p className="text-xs text-muted-foreground p-2">
-                                No integrations found
-                            </p>
-                        )}
-                    </div>
-                </aside>
-
-                {/* Main Content */}
-                <main className="flex-1 flex flex-col">
-                    {selectedFile ? (
-                        <>
-                            {/* Toolbar */}
-                            <div className="h-14 border-b border-border px-4 flex items-center justify-between bg-card/50">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="font-medium">
-                                        {selectedFile}
-                                    </h3>
-                                    {content !== originalContent && (
-                                        <Badge variant="secondary">
-                                            Unsaved
-                                        </Badge>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {error && (
-                                        <span className="text-destructive text-sm flex items-center gap-1">
-                                            <AlertCircle className="h-4 w-4" />
-                                            {error}
-                                        </span>
-                                    )}
-                                    {success && (
-                                        <span className="text-green-500 text-sm flex items-center gap-1">
-                                            <CheckCircle className="h-4 w-4" />
-                                            {success}
-                                        </span>
-                                    )}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                    loadIntegrationContent(
-                                                        selectedFile,
-                                                    )
-                                                }
-                                            >
-                                                <RefreshCw className="h-4 w-4 mr-1" />
-                                                Reload
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            Reload file from disk
-                                        </TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                size="sm"
-                                                onClick={handleSave}
-                                                disabled={
-                                                    saving ||
-                                                    content === originalContent
-                                                }
-                                            >
-                                                <Save className="h-4 w-4 mr-1" />
-                                                {saving ? "Saving..." : "Save"}
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            Save (Ctrl+S)
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </div>
-                            </div>
-
-                            {/* Editor */}
-                            <div className="flex-1 overflow-hidden">
-                                <Editor
-                                    height="100%"
-                                    defaultLanguage="yaml"
-                                    value={content}
-                                    onChange={(value) =>
-                                        setContent(value || "")
-                                    }
-                                    theme="vs-dark"
-                                    options={{
-                                        minimap: { enabled: false },
-                                        fontSize: 14,
-                                        wordWrap: "on",
-                                        automaticLayout: true,
-                                    }}
-                                />
-                            </div>
-
-                            {/* Source Management Section */}
-                            <div className="h-64 border-t border-border bg-card/30 flex flex-col">
-                                <div className="p-3 border-b border-border flex items-center justify-between">
-                                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                                        <Database className="w-4 h-4" />
-                                        Sources using this integration (
-                                        {sources.length})
-                                    </h3>
-                                    <Dialog
-                                        open={showNewSourceDialog}
-                                        onOpenChange={setShowNewSourceDialog}
-                                    >
-                                        <DialogTrigger asChild>
-                                            <Button variant="outline" size="sm">
-                                                <Plus className="h-4 w-4 mr-1" />
-                                                Create Source
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>
-                                                    Create Source
-                                                </DialogTitle>
-                                                <DialogDescription>
-                                                    Create a new data source
-                                                    based on this integration.
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="py-4 space-y-4">
-                                                <div>
-                                                    <label className="text-sm font-medium">
-                                                        Source Name
-                                                    </label>
-                                                    <Input
-                                                        placeholder="My Source Name"
-                                                        value={newSourceName}
-                                                        onChange={(e) =>
-                                                            setNewSourceName(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className="mt-1"
-                                                    />
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        ID will be
-                                                        auto-generated from the
-                                                        name.
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <label className="text-sm font-medium">
-                                                        Integration (Optional)
-                                                    </label>
-                                                    <Input
-                                                        placeholder={selectedFile.replace(
-                                                            ".yaml",
-                                                            "",
-                                                        )}
-                                                        value={
-                                                            newSourceIntegration ||
-                                                            selectedFile.replace(
-                                                                ".yaml",
-                                                                "",
-                                                            )
-                                                        }
-                                                        onChange={(e) =>
-                                                            setNewSourceIntegration(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className="mt-1"
-                                                    />
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        Leave as the current
-                                                        integration or change to
-                                                        another.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <DialogFooter>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setShowNewSourceDialog(
-                                                            false,
-                                                        )
-                                                    }
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    onClick={handleCreateSource}
-                                                >
-                                                    Create
-                                                </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-3">
-                                    {sources.length > 0 ? (
-                                        <div className="grid gap-2">
-                                            {sources.map((source) => (
-                                                <Card
-                                                    key={source.id}
-                                                    className="bg-secondary/50"
-                                                >
-                                                    <CardContent className="p-3 flex items-center justify-between">
-                                                        <div>
-                                                            <span className="font-medium">
-                                                                {source.name}
-                                                            </span>
-                                                            <span className="text-xs text-muted-foreground ml-2">
-                                                                (ID: {source.id}
-                                                                )
-                                                            </span>
-                                                            {source.integration_id && (
-                                                                <span className="text-xs text-muted-foreground ml-2">
-                                                                    via{" "}
-                                                                    {
-                                                                        source.integration_id
-                                                                    }
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-destructive"
-                                                            onClick={() =>
-                                                                handleDeleteSource(
-                                                                    source.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </CardContent>
-                                                </Card>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-xs text-muted-foreground text-center py-4">
-                                            No sources use this integration yet.
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="flex-1 flex items-center justify-center">
-                            <Card className="w-96">
-                                <CardHeader>
-                                    <CardTitle>Select an Integration</CardTitle>
-                                    <CardDescription>
-                                        Choose an integration from the sidebar
-                                        or create a new one.
-                                    </CardDescription>
-                                </CardHeader>
-                            </Card>
-                        </div>
-                    )}
-                </main>
+  return (
+    <TooltipProvider>
+      <div className="flex h-full bg-background text-foreground">
+        {/* Sidebar */}
+        <aside className="w-64 border-r border-border bg-card/30 flex flex-col">
+          <div className="p-4 border-b border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
+                <FileJson className="w-4 h-4" />
+                Integrations
+              </h2>
+              <Dialog
+                open={showNewIntegrationDialog}
+                onOpenChange={setShowNewIntegrationDialog}
+              >
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>New Integration</DialogTitle>
+                    <DialogDescription>
+                      Create a new integration YAML file.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <Input
+                      placeholder="filename.yaml"
+                      value={newFilename}
+                      onChange={(e) => setNewFilename(e.target.value)}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowNewIntegrationDialog(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCreateIntegration}>Create</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-        </TooltipProvider>
-    );
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-2">
+            {integrations.map((file) => (
+              <div
+                key={file}
+                className={`group flex items-center justify-between p-2 rounded-md cursor-pointer mb-1 ${
+                  selectedFile === file
+                    ? "bg-primary/10 text-primary"
+                    : "hover:bg-secondary/50"
+                }`}
+                onClick={() => loadIntegrationContent(file)}
+              >
+                <span className="text-sm truncate">{file}</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteIntegration(file);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
+            {integrations.length === 0 && (
+              <p className="text-xs text-muted-foreground p-2">
+                No integrations found
+              </p>
+            )}
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col">
+          {selectedFile ? (
+            <>
+              {/* Toolbar */}
+              <div className="h-14 border-b border-border px-4 flex items-center justify-between bg-card/50">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-medium">{selectedFile}</h3>
+                  {content !== originalContent && (
+                    <Badge variant="secondary">Unsaved</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {error && (
+                    <span className="text-destructive text-sm flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {error}
+                    </span>
+                  )}
+                  {success && (
+                    <span className="text-green-500 text-sm flex items-center gap-1">
+                      <CheckCircle className="h-4 w-4" />
+                      {success}
+                    </span>
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadIntegrationContent(selectedFile)}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Reload
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Reload file from disk</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={saving || content === originalContent}
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        {saving ? "Saving..." : "Save"}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Save (Ctrl+S)</TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+
+              {/* Editor */}
+              <div className="flex-1 overflow-hidden">
+                <Editor
+                  height="100%"
+                  defaultLanguage="yaml"
+                  value={content}
+                  onChange={(value) => setContent(value || "")}
+                  theme="vs-dark"
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    wordWrap: "on",
+                    automaticLayout: true,
+                  }}
+                />
+              </div>
+
+              {/* Source Management Section */}
+              <div className="h-64 border-t border-border bg-card/30 flex flex-col">
+                <div className="p-3 border-b border-border flex items-center justify-between">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Database className="w-4 h-4" />
+                    Sources using this integration ({sources.length})
+                  </h3>
+                  <Dialog
+                    open={showNewSourceDialog}
+                    onOpenChange={setShowNewSourceDialog}
+                  >
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Create Source
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create Source</DialogTitle>
+                        <DialogDescription>
+                          Create a new data source based on this integration.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4 space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">
+                            Source Name
+                          </label>
+                          <Input
+                            placeholder="My Source Name"
+                            value={newSourceName}
+                            onChange={(e) => setNewSourceName(e.target.value)}
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            ID will be auto-generated from the name.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">
+                            Integration (Optional)
+                          </label>
+                          <Input
+                            placeholder={selectedFile.replace(".yaml", "")}
+                            value={
+                              newSourceIntegration ||
+                              selectedFile.replace(".yaml", "")
+                            }
+                            onChange={(e) =>
+                              setNewSourceIntegration(e.target.value)
+                            }
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Leave as the current integration or change to
+                            another.
+                          </p>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowNewSourceDialog(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button onClick={handleCreateSource}>Create</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3">
+                  {sources.length > 0 ? (
+                    <div className="grid gap-2">
+                      {sources.map((source) => (
+                        <Card key={source.id} className="bg-secondary/50">
+                          <CardContent className="p-3 flex items-center justify-between">
+                            <div>
+                              <span className="font-medium">{source.name}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                (ID: {source.id})
+                              </span>
+                              {source.integration_id && (
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  via {source.integration_id}
+                                </span>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => handleDeleteSource(source.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      No sources use this integration yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <Card className="w-96">
+                <CardHeader>
+                  <CardTitle>Select an Integration</CardTitle>
+                  <CardDescription>
+                    Choose an integration from the sidebar or create a new one.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
+        </main>
+      </div>
+    </TooltipProvider>
+  );
 }

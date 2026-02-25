@@ -11,7 +11,10 @@ import {
 import { cn } from "../lib/utils";
 
 // Format value based on format string (e.g., "${value:.2f}" -> "$12.34")
-function formatValue(value: number | string | undefined, format?: string): string {
+function formatValue(
+  value: number | string | undefined,
+  format?: string,
+): string {
   if (value === undefined || value === null) return "N/A";
   const numValue = typeof value === "string" ? parseFloat(value) : value;
   if (isNaN(numValue)) return String(value);
@@ -19,10 +22,15 @@ function formatValue(value: number | string | undefined, format?: string): strin
   if (format) {
     // Handle template format like "${value:.2f}"
     if (format.includes("{")) {
-      return format.replace(/\{value\}/g, numValue.toFixed(2)).replace(/\$/g, "$");
+      return format
+        .replace(/\{value\}/g, numValue.toFixed(2))
+        .replace(/\$/g, "$");
     }
     // Handle simple format like "$%.2f" or "%.2f"
-    return format.replace(/%/g, "").replace("$", "$").replace("f", numValue.toFixed(2));
+    return format
+      .replace(/%/g, "")
+      .replace("$", "$")
+      .replace("f", numValue.toFixed(2));
   }
 
   // Default formatting for large numbers
@@ -97,13 +105,12 @@ export function QuotaCard({
   const usageValue = usage ?? data.usage ?? data.used;
   const remainingValue = remaining ?? data.remaining ?? data.limit_remaining;
 
-  const limitNum = typeof limitValue === "string" ? parseFloat(limitValue) : limitValue;
-  const usageNum = typeof usageValue === "string" ? parseFloat(usageValue) : usageValue;
+  const limitNum =
+    typeof limitValue === "string" ? parseFloat(limitValue) : limitValue;
+  const usageNum =
+    typeof usageValue === "string" ? parseFloat(usageValue) : usageValue;
 
-  const percentage = calcPercentage(
-    usageNum as number,
-    limitNum as number
-  );
+  const percentage = calcPercentage(usageNum as number, limitNum as number);
   const usageColor = getUsageColor(percentage);
 
   return (
@@ -157,8 +164,8 @@ export function QuotaCard({
                 Number(trendValue) > 0
                   ? "text-amber-500"
                   : Number(trendValue) < 0
-                  ? "text-emerald-500"
-                  : "text-muted-foreground"
+                    ? "text-emerald-500"
+                    : "text-muted-foreground",
               )}
             >
               {Math.abs(trendValue as number).toFixed(2)}%

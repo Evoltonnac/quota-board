@@ -43,7 +43,10 @@ const iconMap: Record<string, ComponentType<{ className?: string }>> = {
 };
 
 // Format value based on format string
-function formatValue(value: number | string | undefined, format?: string): string {
+function formatValue(
+  value: number | string | undefined,
+  format?: string,
+): string {
   if (value === undefined || value === null) return "N/A";
   const numValue = typeof value === "string" ? parseFloat(value) : value;
   if (isNaN(numValue)) return String(value);
@@ -52,7 +55,10 @@ function formatValue(value: number | string | undefined, format?: string): strin
     if (format.includes("{value}")) {
       return format.replace(/\{value\}/g, numValue.toFixed(2));
     }
-    return format.replace(/%/g, "").replace("$", "$").replace("f", numValue.toFixed(2));
+    return format
+      .replace(/%/g, "")
+      .replace("$", "$")
+      .replace("f", numValue.toFixed(2));
   }
 
   if (numValue >= 1000000) {
@@ -120,7 +126,7 @@ export function StatGrid({
             columns === 2 && "grid-cols-2",
             columns === 3 && "grid-cols-3",
             columns === 4 && "grid-cols-2 sm:grid-cols-4",
-            columns === 6 && "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
+            columns === 6 && "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6",
           )}
         >
           {items.map((item, index) => {

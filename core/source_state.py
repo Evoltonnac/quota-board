@@ -15,6 +15,7 @@ class SourceStatus(str, Enum):
     SUSPENDED = "suspended" # 挂起，等待用户交互
     DISABLED = "disabled"
     CONFIG_CHANGED = "config_changed" # 配置已更改，需要重新加载
+    REFRESHING = "refreshing" # 正在刷新中
 
 
 class InteractionType(str, Enum):

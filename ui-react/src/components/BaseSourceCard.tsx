@@ -97,7 +97,10 @@ export function BaseSourceCard({
                                 className="h-7 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20"
                                 onClick={() => onInteract(sourceSummary)}
                             >
-                                Resolve Issue
+                                {sourceSummary.interaction?.type ===
+                                "webview_scrape"
+                                    ? "加入抓取队列"
+                                    : "Resolve Issue"}
                             </Button>
                         )}
                     </div>

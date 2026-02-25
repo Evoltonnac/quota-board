@@ -19,6 +19,7 @@ import {
     Plus,
     Minus,
     Trash2,
+    ExternalLink,
 } from "lucide-react";
 import {
     Card,
@@ -451,36 +452,219 @@ function Dashboard() {
 
     // Monitor for global refresh event
     useEffect(() => {
-        const onRefresh = () => {
-            loadData();
+        const onRefresh = async () => {
+            // If a scraper is running, cancel it first so its result won't race with the new tasks
+            if (activeScraperRef.current) {
+                console.log(
+                    `[Scraper] Global refresh: cancelling active task for ${activeScraperRef.current}`,
+                );
+                activeScraperRef.current = null; // clear ref immediately so scraper_result is discarded
+                try {
+                    await invoke("cancel_scraper_task");
+                } catch (e) {
+                    console.error("Failed to cancel on global refresh:", e);
+                }
+            }
+
+            // OPTIMISTIC UPDATE: Mark all current sources as refreshing
+            setSources((prev) =>
+                prev.map((s) => ({ ...s, status: "refreshing" })),
+            );
+
+            // Clear skipped scrapers on global refresh so webview tasks can be re-queued
+            setSkippedScrapers(new Set());
+            setActiveScraper(null);
+
+            // No need to call loadData() immediately because the polling effect will pick up the 'refreshing' status
+            // and fetch the actual current status from backend.
+            await api
+                .refreshAll()
+                .catch((e) => console.error("Refresh all failed:", e));
         };
         window.addEventListener("app:refresh_data", onRefresh);
         return () => window.removeEventListener("app:refresh_data", onRefresh);
     }, []);
 
+    // --- Scraper Queue Management ---
+    const [activeScraper, setActiveScraper] = useState<string | null>(null);
+    // Ref to track the *current* active scraper ID synchronously.
+    // This is critical for the scraper_result event listener (which is a stale closure)
+    // to guard against processing results from cancelled/superseded tasks.
+    const activeScraperRef = useRef<string | null>(null);
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        activeScraperRef.current = activeScraper;
+    }, [activeScraper]);
+
+    const [skippedScrapers, setSkippedScrapers] = useState<Set<string>>(
+        new Set(),
+    );
+
+    // Dynamic Polling for refreshing sources
+    useEffect(() => {
+        const refreshingSources = sources.filter(
+            (s) => s.status === "refreshing",
+        );
+        if (refreshingSources.length === 0) return;
+
+        console.log(
+            `[Polling] ${refreshingSources.length} sources are refreshing...`,
+        );
+
+        const interval = setInterval(async () => {
+            try {
+                const updatedSources = await api.getSources();
+
+                // Find sources that just finished refreshing
+                const finishedIds = refreshingSources
+                    .filter((oldS) => {
+                        const newS = updatedSources.find(
+                            (s) => s.id === oldS.id,
+                        );
+                        return newS && newS.status !== "refreshing";
+                    })
+                    .map((s) => s.id);
+
+                if (finishedIds.length > 0) {
+                    console.log(
+                        `[Polling] Sources finished refreshing:`,
+                        finishedIds,
+                    );
+                    // Update the sources list to reflect new statuses
+                    setSources(updatedSources);
+
+                    // Trigger data load for these specific sources
+                    const dataPromises = finishedIds.map(async (id) => {
+                        const data = await api.getSourceData(id);
+                        setDataMap((prev) => ({ ...prev, [id]: data }));
+                    });
+                    await Promise.all(dataPromises);
+                } else {
+                    // Update sources anyway to keep UI in sync if backend finally reported 'refreshing'
+                    // (in case our optimistic update was too fast and the first getSources saw the old status)
+                    setSources(updatedSources);
+                }
+            } catch (error) {
+                console.error("Polling failed:", error);
+            }
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [sources]);
+
+    // Compute the current queue of webview scrapers
+    const webviewQueue = sources.filter(
+        (source) =>
+            source.status === "suspended" &&
+            source.interaction?.type === "webview_scrape" &&
+            !skippedScrapers.has(source.id),
+    );
+
+    // Cleanup zombie active scraper if its status changed elsewhere
+    useEffect(() => {
+        if (activeScraper) {
+            const activeSource = sources.find((s) => s.id === activeScraper);
+            if (!activeSource || activeSource.status !== "suspended") {
+                console.log(
+                    "Cleaning up zombie active scraper:",
+                    activeScraper,
+                );
+                setActiveScraper(null);
+                invoke("cancel_scraper_task").catch(console.error);
+            }
+        }
+    }, [sources, activeScraper]);
+
     // Monitor for background scraper tasks
     useEffect(() => {
-        sources.forEach((source) => {
-            if (
-                source.status === "suspended" &&
-                source.interaction?.type === "webview_scrape"
-            ) {
-                const { url, script, intercept_api, secret_key } =
-                    source.interaction.data || {};
+        // If we already have an active scraper, don't start another one
+        if (activeScraper) return;
 
-                // Dispatch silently to Tauri Backend
-                invoke("push_scraper_task", {
-                    sourceId: source.id,
-                    url: url,
-                    injectScript: script,
-                    interceptApi: intercept_api,
-                    secretKey: secret_key,
-                }).catch((err) => {
-                    console.error("Failed to push scraper task to Tauri:", err);
-                });
+        // Pull the next available scraper from the queue
+        const nextSource = webviewQueue.length > 0 ? webviewQueue[0] : null;
+
+        if (nextSource) {
+            const { url, script, intercept_api, secret_key } =
+                nextSource.interaction?.data || {};
+
+            console.log(
+                `Starting scraper for ${nextSource.name} (${nextSource.id})`,
+            );
+            setActiveScraper(nextSource.id);
+
+            // Dispatch to Tauri Backend
+            invoke("push_scraper_task", {
+                sourceId: nextSource.id,
+                url: url,
+                injectScript: script,
+                interceptApi: intercept_api,
+                secretKey: secret_key,
+            }).catch((err) => {
+                console.error("Failed to push scraper task to Tauri:", err);
+                setActiveScraper(null); // Reset on failure so we can try again or try next
+            });
+        }
+    }, [webviewQueue, activeScraper]);
+
+    const handleSkipScraper = async () => {
+        if (!activeScraper) return;
+
+        try {
+            // Cancel the backend task
+            await invoke("cancel_scraper_task");
+        } catch (error) {
+            console.error("Failed to cancel scraper task:", error);
+        }
+
+        // Add to skipped list and clear active so the next one can start
+        setSkippedScrapers((prev) => new Set(prev).add(activeScraper));
+        setActiveScraper(null);
+    };
+
+    const handleClearScraperQueue = async () => {
+        // Cancel if there's an active one
+        if (activeScraper) {
+            try {
+                await invoke("cancel_scraper_task");
+            } catch (error) {
+                console.error("Failed to cancel active scraper task:", error);
             }
+        }
+
+        // Add all current queue items to skipped
+        setSkippedScrapers((prev) => {
+            const newSkipped = new Set(prev);
+            if (activeScraper) newSkipped.add(activeScraper);
+            webviewQueue.forEach((s) => newSkipped.add(s.id));
+            return newSkipped;
         });
-    }, [sources]);
+        setActiveScraper(null);
+    };
+
+    // Push a webview scrape source to the queue manually (e.g., from FlowHandler dialog)
+    // Returns true if successfully added, false if already in queue
+    const handlePushToQueue = (source: SourceSummary): boolean => {
+        // Check if already active
+        if (activeScraper === source.id) {
+            alert(`"${source.name}" 的抓取任务已在运行中。`);
+            return false;
+        }
+        // Check if already in queue (not skipped)
+        const alreadyInQueue = webviewQueue.some((s) => s.id === source.id);
+        if (alreadyInQueue) {
+            alert(`"${source.name}" 已在抓取队列中，请勿重复添加。`);
+            return false;
+        }
+        // Remove from skipped so it can be picked up by the queue effect
+        setSkippedScrapers((prev) => {
+            const next = new Set(prev);
+            next.delete(source.id);
+            return next;
+        });
+        console.log(`手动将 ${source.name} (${source.id}) 加入抓取队列`);
+        return true;
+    };
 
     // Setup global listeners from Tauri
     useEffect(() => {
@@ -494,6 +678,23 @@ function Dashboard() {
             secretKey: string;
         }>("scraper_result", async (event) => {
             const { sourceId, data, error, secretKey } = event.payload;
+
+            // GUARD: If the result is not from the current active scraper (e.g., it was
+            // cancelled due to a global refresh), discard it to prevent duplicate interact calls.
+            if (activeScraperRef.current !== sourceId) {
+                console.warn(
+                    `[Scraper] Discarding stale result for ${sourceId} (current active: ${activeScraperRef.current})`,
+                );
+                return;
+            }
+
+            // Prevent it from being immediately picked up again before reload
+            setSkippedScrapers((prev) => new Set(prev).add(sourceId));
+
+            // Allow next scraper to run
+            setActiveScraper(null);
+            activeScraperRef.current = null;
+
             if (error) {
                 console.error(`Scraper error for ${sourceId}:`, error);
                 return;
@@ -501,8 +702,12 @@ function Dashboard() {
             try {
                 // Send scraped data back to Python Core
                 await api.interact(sourceId, { [secretKey]: data });
-                // Python will resume the flow. We wait a bit then reload to see results.
-                setTimeout(loadData, 2000);
+                // Optimistically mark as refreshing
+                setSources((prev) =>
+                    prev.map((s) =>
+                        s.id === sourceId ? { ...s, status: "refreshing" } : s,
+                    ),
+                );
             } catch (err) {
                 console.error(
                     `Failed to post scraped data for ${sourceId}:`,
@@ -532,16 +737,44 @@ function Dashboard() {
         };
     }, []);
 
+    const handleShowScraperWindow = async () => {
+        try {
+            await invoke("show_scraper_window");
+        } catch (error) {
+            console.error("Failed to show scraper window:", error);
+        }
+    };
+
     const handleRefreshSource = async (sourceId: string) => {
+        // If this source is currently being scraped, cancel the task first
+        // so its result won't race with the fresh new task
+        if (activeScraperRef.current === sourceId) {
+            console.log(
+                `[Scraper] Refresh: cancelling active task for ${sourceId}`,
+            );
+            activeScraperRef.current = null; // clear ref immediately to discard any in-flight result
+            setActiveScraper(null);
+            try {
+                await invoke("cancel_scraper_task");
+            } catch (e) {
+                console.error("Failed to cancel on source refresh:", e);
+            }
+        }
         // Optimistic feedback
         setSources((prev) =>
             prev.map((s) =>
-                s.id === sourceId ? { ...s, status: "refreshing" as any } : s,
+                s.id === sourceId ? { ...s, status: "refreshing" } : s,
             ),
         );
+        // Remove from skipped scrapers so that if it goes back to suspended,
+        // the queue effect will pick it up automatically
+        setSkippedScrapers((prev) => {
+            const next = new Set(prev);
+            next.delete(sourceId);
+            return next;
+        });
         try {
             await api.refreshSource(sourceId);
-            setTimeout(loadData, 2000);
         } catch (error) {
             console.error(`刷新数据源 ${sourceId} 失败:`, error);
         }
@@ -581,14 +814,15 @@ function Dashboard() {
         <TooltipProvider>
             <div className="h-full bg-background text-foreground flex overflow-hidden">
                 {/* Sidebar */}
-                <aside className="w-64 border-r border-border bg-card/30 overflow-y-auto p-4 hidden md:block">
-                    <div className="flex items-center gap-2 mb-4">
+                <aside className="w-64 border-r border-border bg-card/30 flex-col hidden md:flex">
+                    <div className="p-4 border-b border-border flex items-center gap-2">
                         <Database className="w-4 h-4 text-muted-foreground" />
                         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                             数据源状态
                         </h2>
                     </div>
-                    <div className="space-y-2">
+
+                    <div className="space-y-2 p-4 overflow-y-auto flex-1">
                         {sources.map((source) => (
                             <Card
                                 key={source.id}
@@ -674,7 +908,10 @@ function Dashboard() {
                                                 setInteractSource(source)
                                             }
                                         >
-                                            解决问题
+                                            {source.interaction?.type ===
+                                            "webview_scrape"
+                                                ? "加入抓取队列"
+                                                : "解决问题"}
                                         </Button>
                                     )}
                                     {source.error && (
@@ -923,6 +1160,50 @@ function Dashboard() {
                         </div>
                     )}
                 </main>
+
+                {/* Scraper Status Banner */}
+                {(activeScraper || webviewQueue.length > 0) && (
+                    <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-2 fade-in duration-300">
+                        <div className="bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-3 text-sm font-medium">
+                            <div className="flex items-center gap-2">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-200 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                                </span>
+                                <span>
+                                    正在后台抓取网页:{" "}
+                                    {sources.find((s) => s.id === activeScraper)
+                                        ?.name || "准备中..."}
+                                </span>
+                                {webviewQueue.length > 0 && (
+                                    <span className="text-blue-200 text-xs bg-blue-700/50 px-2 py-0.5 rounded-full ml-1">
+                                        剩余 {webviewQueue.length} 个
+                                    </span>
+                                )}
+                            </div>
+                            <div className="h-4 w-px bg-blue-400 mx-1"></div>
+                            <button
+                                onClick={handleShowScraperWindow}
+                                className="hover:text-blue-100 transition-colors flex items-center gap-1 text-xs bg-blue-500/50 hover:bg-blue-500/80 px-3 py-1.5 rounded-full"
+                            >
+                                <ExternalLink className="h-3 w-3" />
+                                显示浏览器
+                            </button>
+                            <button
+                                onClick={handleSkipScraper}
+                                className="hover:text-blue-100 transition-colors flex items-center gap-1 text-xs bg-blue-500/50 hover:bg-blue-500/80 px-3 py-1.5 rounded-full"
+                            >
+                                跳过当前
+                            </button>
+                            <button
+                                onClick={handleClearScraperQueue}
+                                className="text-red-100 hover:text-white transition-colors flex items-center gap-1 text-xs bg-red-500/60 hover:bg-red-500/90 px-3 py-1.5 rounded-full"
+                            >
+                                清空队列
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <AddWidgetDialog
@@ -939,6 +1220,7 @@ function Dashboard() {
                     // Refresh data after successful interaction
                     setTimeout(loadData, 1000);
                 }}
+                onPushToQueue={handlePushToQueue}
             />
         </TooltipProvider>
     );
