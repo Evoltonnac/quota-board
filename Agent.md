@@ -81,13 +81,13 @@ quota-board/
 │   ├── parser.py            # 解析器
 │   ├── data_controller.py   # TinyDB 操作
 │   └── api.py               # FastAPI 路由
-├── ui-react/                # Modern Frontend (React + Vite)
+├── ui-react/                # Modern Desktop Frontend (Tauri + React + Vite)
+│   ├── src-tauri/           # Tauri Rust Backend (用于 WebView 原生交互等)
 │   ├── src/
 │   │   ├── components/      # UI 组件
 │   │   ├── lib/             # 工具函数 (API client 等)
 │   │   └── App.tsx          # 根组件
 │   └── package.json
-├── ui/                      # [Legacy] Streamlit 前端（已废弃）
 └── data/                    # 运行时数据（.gitignore 已忽略）
     ├── sources.json         # 存储的数据源配置
     ├── views.json           # 存储的视图配置

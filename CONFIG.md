@@ -184,9 +184,12 @@ integrations:
 | 类型 | 说明 |
 |------|------|
 | `api_key` | 获取用户输入的 API Key |
-| `http` | 发送 HTTP 请求 |
 | `oauth` | 处理 OAuth 授权和 Token 获取 |
-| `extract` | 数据提取（JSONPath/Regex/Key） |
+| `curl` | [新增] 解析用户输入的 cURL 命令获取头信息 |
+| `webview` | [新增] 后台无头浏览器拦截请求和执行脚本提取 |
+| `http` | 发送 HTTP 请求 |
+| `extract` | 数据提取（JSONPath / Key） |
+| `script` | [新增] 运行自定义 Python 脚本进行复杂数据处理 |
 | `log` | 打印日志（调试用） |
 
 ---
@@ -241,9 +244,47 @@ integrations:
 
 - `args`:
   - `source`: string (源变量，支持 `{var}`)
-  - `type`: "jsonpath" | "regex" | "key"
+  - `type`: "jsonpath" | "key"
   - `expr`: string (表达式)
 - `outputs`: 提取结果保存到变量
+
+### `curl` - cURL 请求解析
+
+用于从用户粘贴的 cURL 命令中提取请求头信息。
+
+- `secrets`:
+  - `curl_command`: string (保存的密钥名称ID)
+- `args`:
+  - `label`: string (前端显示的标签)
+  - `description`: string (可选，前端显示的描述信息)
+  - `message`: string (可选，弹窗提示标题)
+  - `warning_message`: string (可选，警告信息)
+- `outputs`:
+  - 指定提取的请求头（如 `authorization`）
+  - `headers`: 包含所有提取到的请求头字典
+  - `curl_command`: 原始 cURL 字符串
+
+### `webview` - 后台 WebView 爬取
+
+使用隐式 WebView 加载页面执行注入的 JavaScript 获取数据。
+
+- `secrets`:
+  - `webview_data`: string (保存的截获数据对象名称)
+- `args`:
+  - `url`: string (必填，目标 URL)
+  - `intercept_api`: string (要拦截的 API 请求匹配字符串)
+  - `script`: string (注入到页面的环境脚本，可为空)
+- `outputs`:
+  - 从 `webview_data` JSON 数据中提取任意字段
+
+### `script` - 自定义 Python 执行
+
+在 Flow 中安全执行自定义 Python 代码处理已有的输出或者进行计算。
+
+- `args`:
+  - `code`: string (必填，包裹在 Flow 执行环境中的 Python 代码)
+- `outputs`:
+  - 提取在脚本中定义的局部变量字典
 
 ### `log` - 打印日志
 
@@ -308,10 +349,7 @@ integrations:
   "items": [
     {
       "id": "widget_1",
-      "x": 0,
-      "y": 0,
       "w": 4,
-      "h": 4,
       "source_id": "my_source",
       "template_id": "metric_usage",
       "props": {
@@ -336,10 +374,7 @@ integrations:
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `id` | string | 唯一标识符 |
-| `x` | int | 网格列起始位置 |
-| `y` | int | 网格行起始位置 |
 | `w` | int | 宽度（列数） |
-| `h` | int | 高度（行数） |
 | `source_id` | string | 关联的数据源 ID |
 | `template_id` | string | 关联的 Integration 模板 ID |
 | `props` | object | 模板属性覆盖 |
