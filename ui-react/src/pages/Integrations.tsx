@@ -228,7 +228,7 @@ export default function IntegrationsPage() {
 
     return (
         <TooltipProvider>
-            <div className="flex h-screen bg-background text-foreground">
+            <div className="flex h-full bg-background text-foreground">
                 {/* Sidebar */}
                 <aside className="w-64 border-r border-border bg-card/30 flex flex-col">
                     <div className="p-4 border-b border-border">

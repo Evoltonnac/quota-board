@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "./api/client";
@@ -11,11 +11,8 @@ import type {
 } from "./types/config";
 import {
     RefreshCw,
-    Activity,
     Database,
     MoreVertical,
-    Settings,
-    FileJson,
     Pencil,
     ArrowLeft,
     ArrowRight,
@@ -48,12 +45,7 @@ import {
     DialogDescription,
     DialogFooter,
 } from "./components/ui/dialog";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "./components/ui/tooltip";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { QuotaCard } from "./components/QuotaCard";
 import { StatGrid } from "./components/StatGrid";
 import { FlowHandler } from "./components/auth/FlowHandler";
@@ -61,6 +53,7 @@ import { OAuthCallback } from "./components/auth/OAuthCallback";
 import { BaseSourceCard } from "./components/BaseSourceCard";
 import { AddWidgetDialog } from "./components/AddWidgetDialog";
 import IntegrationsPage from "./pages/Integrations";
+import { TopNav } from "./components/TopNav";
 
 // Format value helper
 function formatValue(value: any, format?: string): string {
@@ -456,6 +449,15 @@ function Dashboard() {
         loadData();
     }, []);
 
+    // Monitor for global refresh event
+    useEffect(() => {
+        const onRefresh = () => {
+            loadData();
+        };
+        window.addEventListener("app:refresh_data", onRefresh);
+        return () => window.removeEventListener("app:refresh_data", onRefresh);
+    }, []);
+
     // Monitor for background scraper tasks
     useEffect(() => {
         sources.forEach((source) => {
@@ -530,15 +532,6 @@ function Dashboard() {
         };
     }, []);
 
-    const handleRefreshAll = async () => {
-        try {
-            await api.refreshAll();
-            setTimeout(loadData, 2000);
-        } catch (error) {
-            console.error("刷新失败:", error);
-        }
-    };
-
     const handleRefreshSource = async (sourceId: string) => {
         // Optimistic feedback
         setSources((prev) =>
@@ -586,424 +579,350 @@ function Dashboard() {
 
     return (
         <TooltipProvider>
-            <div className="min-h-screen bg-background text-foreground">
-                {/* Header */}
-                <header className="border-b border-border px-6 py-4 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg">
-                                <Activity className="w-6 h-6 text-primary" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold">
-                                    {viewConfig?.name || "Quota Board"}
-                                </h1>
-                                <p className="text-xs text-muted-foreground">
-                                    配额监控面板
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleRefreshAll}
-                                    >
-                                        <RefreshCw className="w-4 h-4 mr-2" />
-                                        刷新全部
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>重新获取所有数据源的配额数据</p>
-                                </TooltipContent>
-                            </Tooltip>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem asChild>
-                                        <Link
-                                            to="/integrations"
-                                            className="flex items-center"
-                                        >
-                                            <FileJson className="mr-2 h-4 w-4" />
-                                            集成管理
-                                        </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem>
-                                        <Settings className="mr-2 h-4 w-4" />
-                                        系统设置
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem>关于</DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
+            <div className="h-full bg-background text-foreground flex overflow-hidden">
+                {/* Sidebar */}
+                <aside className="w-64 border-r border-border bg-card/30 overflow-y-auto p-4 hidden md:block">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Database className="w-4 h-4 text-muted-foreground" />
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                            数据源状态
+                        </h2>
                     </div>
-                </header>
-
-                <div className="flex">
-                    {/* Sidebar */}
-                    <aside className="w-64 border-r border-border bg-card/30 min-h-[calc(100vh-73px)] p-4 hidden md:block">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Database className="w-4 h-4 text-muted-foreground" />
-                            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                                数据源状态
-                            </h2>
-                        </div>
-                        <div className="space-y-2">
-                            {sources.map((source) => (
-                                <Card
-                                    key={source.id}
-                                    className="bg-secondary/50 border-border/50"
-                                >
-                                    <CardContent className="p-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2 overflow-hidden max-w-[120px]">
-                                                <span className="font-medium text-sm truncate">
-                                                    {source.name}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <Badge
-                                                    variant={
-                                                        (source.status as string) ===
-                                                        "refreshing"
-                                                            ? "default"
-                                                            : source.has_data
-                                                              ? "success"
-                                                              : source.error
-                                                                ? "destructive"
-                                                                : "secondary"
-                                                    }
-                                                >
-                                                    {(source.status as string) ===
-                                                    "refreshing"
-                                                        ? "刷新中"
-                                                        : source.has_data
-                                                          ? "正常"
-                                                          : source.error
-                                                            ? "错误"
-                                                            : (source.status as string) ===
-                                                                "suspended"
-                                                              ? "需操作"
-                                                              : "等待"}
-                                                </Badge>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger
-                                                        asChild
-                                                    >
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-6 w-6"
-                                                        >
-                                                            <MoreVertical className="h-3 w-3" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem
-                                                            onSelect={(e) => {
-                                                                e.preventDefault();
-                                                                handleRefreshSource(
-                                                                    source.id,
-                                                                );
-                                                            }}
-                                                        >
-                                                            <RefreshCw className="mr-2 h-4 w-4" />
-                                                            刷新
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            onSelect={(e) => {
-                                                                e.preventDefault();
-                                                                setDeletingSourceId(
-                                                                    source.id,
-                                                                );
-                                                            }}
-                                                            className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
-                                                        >
-                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                            删除
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
+                    <div className="space-y-2">
+                        {sources.map((source) => (
+                            <Card
+                                key={source.id}
+                                className="bg-secondary/50 border-border/50"
+                            >
+                                <CardContent className="p-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 overflow-hidden max-w-[120px]">
+                                            <span className="font-medium text-sm truncate">
+                                                {source.name}
+                                            </span>
                                         </div>
-                                        {source.status === "suspended" && (
-                                            <Button
-                                                variant="default"
-                                                size="sm"
-                                                className="w-full mt-2"
-                                                onClick={() =>
-                                                    setInteractSource(source)
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <Badge
+                                                variant={
+                                                    (source.status as string) ===
+                                                    "refreshing"
+                                                        ? "default"
+                                                        : source.has_data
+                                                          ? "success"
+                                                          : source.error
+                                                            ? "destructive"
+                                                            : "secondary"
                                                 }
                                             >
-                                                解决问题
+                                                {(source.status as string) ===
+                                                "refreshing"
+                                                    ? "刷新中"
+                                                    : source.has_data
+                                                      ? "正常"
+                                                      : source.error
+                                                        ? "错误"
+                                                        : (source.status as string) ===
+                                                            "suspended"
+                                                          ? "需操作"
+                                                          : "等待"}
+                                            </Badge>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                    >
+                                                        <MoreVertical className="h-3 w-3" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem
+                                                        onSelect={(e) => {
+                                                            e.preventDefault();
+                                                            handleRefreshSource(
+                                                                source.id,
+                                                            );
+                                                        }}
+                                                    >
+                                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                                        刷新
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        onSelect={(e) => {
+                                                            e.preventDefault();
+                                                            setDeletingSourceId(
+                                                                source.id,
+                                                            );
+                                                        }}
+                                                        className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                                                    >
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        删除
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    </div>
+                                    {source.status === "suspended" && (
+                                        <Button
+                                            variant="default"
+                                            size="sm"
+                                            className="w-full mt-2"
+                                            onClick={() =>
+                                                setInteractSource(source)
+                                            }
+                                        >
+                                            解决问题
+                                        </Button>
+                                    )}
+                                    {source.error && (
+                                        <div className="mt-2">
+                                            <p className="text-xs text-destructive line-clamp-2">
+                                                {source.error}
+                                            </p>
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                className="w-full mt-2 h-7"
+                                                onClick={() =>
+                                                    setInteractSource(source)
+                                                } // Allow opening generic handler or specialized retry
+                                            >
+                                                重试 / 详情
                                             </Button>
-                                        )}
-                                        {source.error && (
-                                            <div className="mt-2">
-                                                <p className="text-xs text-destructive line-clamp-2">
-                                                    {source.error}
-                                                </p>
-                                                <Button
-                                                    variant="destructive"
-                                                    size="sm"
-                                                    className="w-full mt-2 h-7"
-                                                    onClick={() =>
-                                                        setInteractSource(
-                                                            source,
-                                                        )
-                                                    } // Allow opening generic handler or specialized retry
-                                                >
-                                                    重试 / 详情
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
 
-                        <Dialog
-                            open={deletingSourceId !== null}
-                            onOpenChange={(open) =>
-                                !open && setDeletingSourceId(null)
-                            }
-                        >
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>确认删除</DialogTitle>
-                                    <DialogDescription>
-                                        确定要删除此数据源吗？相关配置和本地数据也将被清除，此操作不可撤销。
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <DialogFooter>
-                                    <Button
-                                        variant="outline"
-                                        onClick={() =>
-                                            setDeletingSourceId(null)
-                                        }
-                                    >
-                                        取消
-                                    </Button>
-                                    <Button
-                                        variant="destructive"
-                                        onClick={() =>
-                                            deletingSourceId &&
-                                            handleDeleteSource(deletingSourceId)
-                                        }
-                                    >
-                                        确认删除
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    </aside>
-
-                    {/* Main Content */}
-                    <main className="flex-1 p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-lg font-semibold">监控视图</h2>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant={
-                                        isEditMode ? "secondary" : "outline"
-                                    }
-                                    size="sm"
-                                    onClick={() => setIsEditMode(!isEditMode)}
-                                >
-                                    <Pencil className="w-4 h-4 mr-1" />
-                                    {isEditMode ? "完成编辑" : "编辑排布"}
-                                </Button>
-                                <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={() => setIsAddDialogOpen(true)}
-                                >
-                                    + 添加小组件
-                                </Button>
-                            </div>
-                        </div>
-
-                        {!viewConfig || viewConfig.items.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-lg bg-card/30">
-                                <p className="text-muted-foreground mb-4">
-                                    当前视图还没有任何组件。
-                                </p>
+                    <Dialog
+                        open={deletingSourceId !== null}
+                        onOpenChange={(open) =>
+                            !open && setDeletingSourceId(null)
+                        }
+                    >
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>确认删除</DialogTitle>
+                                <DialogDescription>
+                                    确定要删除此数据源吗？相关配置和本地数据也将被清除，此操作不可撤销。
+                                </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
                                 <Button
                                     variant="outline"
-                                    onClick={() => setIsAddDialogOpen(true)}
+                                    onClick={() => setDeletingSourceId(null)}
                                 >
-                                    添加第一个组件
+                                    取消
                                 </Button>
-                            </div>
-                        ) : (
-                            <div
-                                className="grid gap-4 grid-flow-row-dense"
-                                style={{
-                                    gridTemplateColumns: `repeat(${viewConfig.layout_columns || 12}, minmax(0, 1fr))`,
-                                    gridAutoRows: "minmax(80px, auto)",
-                                }}
+                                <Button
+                                    variant="destructive"
+                                    onClick={() =>
+                                        deletingSourceId &&
+                                        handleDeleteSource(deletingSourceId)
+                                    }
+                                >
+                                    确认删除
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </aside>
+
+                {/* Main Content */}
+                <main className="flex-1 p-6 overflow-y-auto">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-lg font-semibold">监控视图</h2>
+                        <div className="flex gap-2">
+                            <Button
+                                variant={isEditMode ? "secondary" : "outline"}
+                                size="sm"
+                                onClick={() => setIsEditMode(!isEditMode)}
                             >
-                                {viewConfig.items.map((item, index) => {
-                                    const sourceData = item.source_id
-                                        ? dataMap[item.source_id]
-                                        : null;
-                                    const sourceSummary = item.source_id
-                                        ? sources.find(
-                                              (s) => s.id === item.source_id,
-                                          )
-                                        : undefined;
+                                <Pencil className="w-4 h-4 mr-1" />
+                                {isEditMode ? "完成编辑" : "编辑排布"}
+                            </Button>
+                            <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => setIsAddDialogOpen(true)}
+                            >
+                                + 添加小组件
+                            </Button>
+                        </div>
+                    </div>
 
-                                    const comp: ViewComponent = {
-                                        type: (item.props?.type ||
-                                            item.template_id ||
-                                            "source_card") as any,
-                                        label:
-                                            item.props?.label ||
-                                            item.template_id,
-                                        ...item.props,
-                                    };
+                    {!viewConfig || viewConfig.items.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-lg bg-card/30">
+                            <p className="text-muted-foreground mb-4">
+                                当前视图还没有任何组件。
+                            </p>
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsAddDialogOpen(true)}
+                            >
+                                添加第一个组件
+                            </Button>
+                        </div>
+                    ) : (
+                        <div
+                            className="grid gap-4 grid-flow-row-dense"
+                            style={{
+                                gridTemplateColumns: `repeat(${viewConfig.layout_columns || 12}, minmax(0, 1fr))`,
+                                gridAutoRows: "minmax(80px, auto)",
+                            }}
+                        >
+                            {viewConfig.items.map((item, index) => {
+                                const sourceData = item.source_id
+                                    ? dataMap[item.source_id]
+                                    : null;
+                                const sourceSummary = item.source_id
+                                    ? sources.find(
+                                          (s) => s.id === item.source_id,
+                                      )
+                                    : undefined;
 
-                                    return (
-                                        <div
-                                            key={index}
-                                            style={{
-                                                gridColumn: `span ${item.w}`,
-                                                display: "flex", // ensure children can fill
-                                                flexDirection: "column",
-                                            }}
-                                            className={`h-full min-h-0 relative ${isEditMode ? "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-xl" : ""}`}
-                                        >
-                                            <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col [&>div]:h-full [&>div]:flex-1">
-                                                {renderComponent(
-                                                    comp,
-                                                    sourceData,
-                                                    index,
-                                                    sourceSummary,
-                                                    setInteractSource,
-                                                )}
-                                            </div>
+                                const comp: ViewComponent = {
+                                    type: (item.props?.type ||
+                                        item.template_id ||
+                                        "source_card") as any,
+                                    label:
+                                        item.props?.label || item.template_id,
+                                    ...item.props,
+                                };
 
-                                            {isEditMode && (
-                                                <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] z-10 rounded-xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                                    <div className="bg-background border border-border rounded-lg shadow-xl p-3 flex flex-col gap-3 min-w-[160px]">
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <span className="text-xs font-medium text-foreground">
-                                                                排序
-                                                            </span>
-                                                            <div className="flex items-center gap-1">
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="outline"
-                                                                    className="h-6 w-6"
-                                                                    onClick={() =>
-                                                                        handleMoveWidget(
-                                                                            index,
-                                                                            "up",
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        index ===
-                                                                        0
-                                                                    }
-                                                                >
-                                                                    <ArrowLeft className="h-3 w-3" />
-                                                                </Button>
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="outline"
-                                                                    className="h-6 w-6"
-                                                                    onClick={() =>
-                                                                        handleMoveWidget(
-                                                                            index,
-                                                                            "down",
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        index ===
-                                                                        viewConfig
-                                                                            .items
-                                                                            .length -
-                                                                            1
-                                                                    }
-                                                                >
-                                                                    <ArrowRight className="h-3 w-3" />
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <span className="text-xs font-medium text-foreground">
-                                                                宽度 ({item.w})
-                                                            </span>
-                                                            <div className="flex items-center gap-1">
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="outline"
-                                                                    className="h-6 w-6"
-                                                                    onClick={() =>
-                                                                        handleUpdateWidgetSize(
-                                                                            index,
-                                                                            -1,
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        item.w <=
-                                                                        1
-                                                                    }
-                                                                >
-                                                                    <Minus className="h-3 w-3" />
-                                                                </Button>
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="outline"
-                                                                    className="h-6 w-6"
-                                                                    onClick={() =>
-                                                                        handleUpdateWidgetSize(
-                                                                            index,
-                                                                            1,
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        item.w >=
-                                                                        viewConfig.layout_columns
-                                                                    }
-                                                                >
-                                                                    <Plus className="h-3 w-3" />
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                        <Button
-                                                            variant="destructive"
-                                                            size="sm"
-                                                            className="w-full h-7 mt-1 text-xs"
-                                                            onClick={() =>
-                                                                handleDeleteWidget(
-                                                                    index,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Trash2 className="h-3 w-3 mr-1" />{" "}
-                                                            删除
-                                                        </Button>
-                                                    </div>
-                                                </div>
+                                return (
+                                    <div
+                                        key={index}
+                                        style={{
+                                            gridColumn: `span ${item.w}`,
+                                            display: "flex", // ensure children can fill
+                                            flexDirection: "column",
+                                        }}
+                                        className={`h-full min-h-0 relative ${isEditMode ? "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-xl" : ""}`}
+                                    >
+                                        <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col [&>div]:h-full [&>div]:flex-1">
+                                            {renderComponent(
+                                                comp,
+                                                sourceData,
+                                                index,
+                                                sourceSummary,
+                                                setInteractSource,
                                             )}
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </main>
-                </div>
+
+                                        {isEditMode && (
+                                            <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] z-10 rounded-xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                                <div className="bg-background border border-border rounded-lg shadow-xl p-3 flex flex-col gap-3 min-w-[160px]">
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="text-xs font-medium text-foreground">
+                                                            排序
+                                                        </span>
+                                                        <div className="flex items-center gap-1">
+                                                            <Button
+                                                                size="icon"
+                                                                variant="outline"
+                                                                className="h-6 w-6"
+                                                                onClick={() =>
+                                                                    handleMoveWidget(
+                                                                        index,
+                                                                        "up",
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    index === 0
+                                                                }
+                                                            >
+                                                                <ArrowLeft className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="outline"
+                                                                className="h-6 w-6"
+                                                                onClick={() =>
+                                                                    handleMoveWidget(
+                                                                        index,
+                                                                        "down",
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    index ===
+                                                                    viewConfig
+                                                                        .items
+                                                                        .length -
+                                                                        1
+                                                                }
+                                                            >
+                                                                <ArrowRight className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="text-xs font-medium text-foreground">
+                                                            宽度 ({item.w})
+                                                        </span>
+                                                        <div className="flex items-center gap-1">
+                                                            <Button
+                                                                size="icon"
+                                                                variant="outline"
+                                                                className="h-6 w-6"
+                                                                onClick={() =>
+                                                                    handleUpdateWidgetSize(
+                                                                        index,
+                                                                        -1,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    item.w <= 1
+                                                                }
+                                                            >
+                                                                <Minus className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="outline"
+                                                                className="h-6 w-6"
+                                                                onClick={() =>
+                                                                    handleUpdateWidgetSize(
+                                                                        index,
+                                                                        1,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    item.w >=
+                                                                    viewConfig.layout_columns
+                                                                }
+                                                            >
+                                                                <Plus className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="sm"
+                                                        className="w-full h-7 mt-1 text-xs"
+                                                        onClick={() =>
+                                                            handleDeleteWidget(
+                                                                index,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Trash2 className="h-3 w-3 mr-1" />{" "}
+                                                        删除
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </main>
             </div>
 
             <AddWidgetDialog
@@ -1028,11 +947,22 @@ function Dashboard() {
 function App() {
     return (
         <BrowserRouter>
-            <Routes>
-                <Route path="/oauth/callback" element={<OAuthCallback />} />
-                <Route path="/integrations" element={<IntegrationsPage />} />
-                <Route path="/" element={<Dashboard />} />
-            </Routes>
+            <div className="flex h-screen flex-col bg-background text-foreground">
+                <TopNav />
+                <div className="flex-1 overflow-hidden relative">
+                    <Routes>
+                        <Route
+                            path="/oauth/callback"
+                            element={<OAuthCallback />}
+                        />
+                        <Route
+                            path="/integrations"
+                            element={<IntegrationsPage />}
+                        />
+                        <Route path="/" element={<Dashboard />} />
+                    </Routes>
+                </div>
+            </div>
         </BrowserRouter>
     );
 }
