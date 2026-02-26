@@ -374,7 +374,10 @@ integrations:
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `id` | string | 唯一标识符 |
+| `x` | int | 网格列位置（默认 0） |
+| `y` | int | 网格行位置（默认 0） |
 | `w` | int | 宽度（列数） |
+| `h` | int | 高度（行数，默认 2） |
 | `source_id` | string | 关联的数据源 ID |
 | `template_id` | string | 关联的 Integration 模板 ID |
 | `props` | object | 模板属性覆盖 |

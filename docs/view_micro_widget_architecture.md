@@ -26,10 +26,11 @@ The view layer of this project evolves towards a "low-code / configuration-drive
 
 ## Architecture Model: Standard Blackbox Base + Dynamic Micro-Slots
 
-The entire view layer is abstracted into a two-dimensional system: **`Base Source Card` + `Widgets Slots`**. 
-We utilize a seamless, waterfall-like layout (Masonry). The exact placement and footprint of widgets flow dynamically based on their configured width (`columns_span`). 
+The entire view layer is abstracted into a two-dimensional system: **`Base Source Card` + `Widgets Slots`**.
 
-**Crucially, all fixed "row" or "height" configurations have been completely removed.** Height must be 100% content-driven and auto-adaptive (`max-content`). This ensures true dynamic wrapping and eliminates the problem of content truncation or awkward empty gaps associated with hardcoded grid rows. If a component is likely to expand indefinitely (like a List), it must handle height internally via Data Pagination or content threshold clipping rather than relying on an external preset height constraint. Components respond automatically to parent grid configurations laterally, and adapt vertically.
+**Dashboard-level layout:** View items (cards) can be positioned on a grid via `x`, `y`, `w`, `h` (column/row position and span). This enables drag-and-drop and persistent grid layouts (e.g. GridStack).
+
+**Within a card:** Widgets use a flow layout. Optional `row_span` on a widget config acts as a proportional row-height weight for distributing vertical space among sibling widgets (rendered as `flex: <row_span>`). Where `row_span` is not set, height remains content-driven and auto-adaptive (`max-content`). Components that can grow indefinitely (e.g. List) must handle height via pagination or content clipping, not external fixed height.
 
 ### 1. Base Source Card (Shell Specification, Non-customizable)
 Every mounted cloud platform service, regardless of the unique data it returns, must be wrapped in this standard shell.
@@ -50,7 +51,7 @@ All future display elements must be found or carefully extended within the follo
 *Primarily used to highlight cash flow or the most critical single quantitative metrics.*
 * **`hero_metric` (Core Highlighted Value)**
   * **Role:** Highlights a single core metric in a large font.
-  * **Core Config:** `amount` (template string), `prefix`/`currency` (e.g., USD), `delta` (change amount, automatically handles red/green trend arrows).
+  * **Core Config:** `amount` (template string), `prefix`/`currency` (e.g., USD), `delta` (change amount, automatically handles red/green trend arrows). Optional `row_span` for vertical space weight among siblings.
 * **`trend_sparkline` (Minimalist Trend Background Line)**
   * **Role:** A pure trend helper line without any XY axes, typically used to illustrate stability or sudden spikes.
   * **Core Config:** `history_array` (must accept a 1D numeric array). Allows users to visually toggle between line and vertical bar charts.
@@ -59,7 +60,7 @@ All future display elements must be found or carefully extended within the follo
 *Primarily used to reflect the trade-off game between restriction conditions and consumption progress.*
 * **`quota_bar` (Linear Progress Bar)**
   * **Role:** Stretches horizontally, suitable for quota comparisons with long text descriptions.
-  * **Core Config:** `usage`, `limit`, `color_thresholds` (color-changing logic for high-risk warnings).
+  * **Core Config:** `usage`, `limit`, `color_thresholds` (color-changing logic for high-risk warnings). Optional `row_span` for vertical space weight.
 * **`gauge_ring` (Circular Dial/Ring)**
   * **Role:** Expresses percentages in compact vertical spaces.
   * **Core Config:** Same as above, plus `size` preferences (thin ring / thick solid ring UI settings).
@@ -68,7 +69,7 @@ All future display elements must be found or carefully extended within the follo
 *Used to handle irregular sporadic data and scattered information.*
 * **`key_value_grid` (Attribute Field Grid)**
   * **Role:** Flattens and displays information that doesn't "qualify" for a standalone chart but must be shown.
-  * **Core Config:** `items` mapping dictionary (String Label -> Template Value String), supporting adaptive squishing of up to 2~3 columns.
+  * **Core Config:** `items` mapping dictionary (String Label -> Template Value String), supporting adaptive squishing of up to 2~3 columns. Optional `row_span` for vertical space weight.
 * **`divider` (Visual Isolation Band)**
   * **Role:** Extremely lightweight pure visual dashed divider, used to segment layouts when card height is large.
 

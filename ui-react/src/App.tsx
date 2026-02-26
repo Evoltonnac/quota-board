@@ -1,10 +1,13 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { GridStack } from "gridstack";
+import "gridstack/dist/gridstack.min.css";
 import { api } from "./api/client";
 import type {
     StoredView,
+    ViewItem,
     SourceSummary,
     DataResponse,
     ViewComponent,
@@ -13,11 +16,6 @@ import {
     RefreshCw,
     Database,
     MoreVertical,
-    Pencil,
-    ArrowLeft,
-    ArrowRight,
-    Plus,
-    Minus,
     Trash2,
     ExternalLink,
 } from "lucide-react";
@@ -56,6 +54,10 @@ import { AddWidgetDialog } from "./components/AddWidgetDialog";
 import IntegrationsPage from "./pages/Integrations";
 import { TopNav } from "./components/TopNav";
 
+// GridStack layout constants — keep in sync with --qb-row-height / --qb-grid-margin in index.css
+const GRID_ROW_HEIGHT = 80;
+const GRID_MARGIN = 8;
+
 // Format value helper
 function formatValue(value: any, format?: string): string {
     if (value === undefined || value === null) return "N/A";
@@ -89,6 +91,20 @@ function getStatus(
     return "ok";
 }
 
+// Delete button shown on header hover
+function DeleteBtn({ onDelete }: { onDelete?: () => void }) {
+    if (!onDelete) return null;
+    return (
+        <button
+            className="qb-delete-btn shrink-0 ml-2 opacity-0 group-hover/card:opacity-100 transition-opacity rounded p-0.5 text-muted-foreground hover:text-destructive-foreground hover:bg-destructive"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            title="删除"
+        >
+            <Trash2 className="h-3 w-3" />
+        </button>
+    );
+}
+
 // Render component based on type
 function renderComponent(
     comp: ViewComponent,
@@ -96,13 +112,14 @@ function renderComponent(
     index: number,
     sourceSummary?: SourceSummary,
     onInteract?: (source: SourceSummary) => void,
+    onDelete?: () => void,
 ) {
     const data = sourceData?.data || {};
     const error = sourceData?.error;
 
     // Handle use_group (component groups)
     if (comp.use_group) {
-        return renderComponentGroup(comp, sourceData, index);
+        return renderComponentGroup(comp, sourceData, index, onDelete);
     }
 
     switch (comp.type) {
@@ -114,6 +131,7 @@ function renderComponent(
                     sourceSummary={sourceSummary}
                     sourceData={sourceData}
                     onInteract={onInteract}
+                    onDelete={onDelete}
                 />
             );
 
@@ -131,6 +149,7 @@ function renderComponent(
                         (data.usage as number) || 0,
                         (data.limit as number) || 0,
                     )}
+                    onDelete={onDelete}
                 />
             );
 
@@ -142,18 +161,26 @@ function renderComponent(
                     items={comp.items || []}
                     data={data}
                     columns={comp.columns || 4}
+                    onDelete={onDelete}
                 />
             );
 
         case "metric":
             return (
-                <Card key={index} className="bg-card border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                <Card
+                    key={index}
+                    className="bg-card border-border flex flex-col h-full overflow-hidden"
+                >
+                    <div
+                        className="qb-card-header flex-shrink-0 flex items-center justify-between px-3 border-b border-border/40 bg-card"
+                        style={{ height: "var(--qb-card-header-height)" }}
+                    >
+                        <span className="text-xs font-medium text-muted-foreground truncate">
                             {comp.label || comp.field}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                        </span>
+                        <DeleteBtn onDelete={onDelete} />
+                    </div>
+                    <CardContent className="flex-1 overflow-auto min-h-0 flex flex-col justify-center px-3 py-2">
                         <div className="text-2xl font-bold">
                             {formatValue(data[comp.field || ""], comp.format)}
                         </div>
@@ -190,13 +217,20 @@ function renderComponent(
             const max = data[comp.max_field || ""] || data.limit || 100;
             const percentage = max ? ((value as number) / max) * 100 : 0;
             return (
-                <Card key={index} className="bg-card border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                <Card
+                    key={index}
+                    className="bg-card border-border flex flex-col h-full overflow-hidden"
+                >
+                    <div
+                        className="qb-card-header flex-shrink-0 flex items-center justify-between px-3 border-b border-border/40 bg-card"
+                        style={{ height: "var(--qb-card-header-height)" }}
+                    >
+                        <span className="text-xs font-medium text-muted-foreground truncate">
                             {comp.label}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                        </span>
+                        <DeleteBtn onDelete={onDelete} />
+                    </div>
+                    <CardContent className="flex-1 overflow-auto min-h-0 flex flex-col justify-center px-3 py-2">
                         <div className="w-full bg-secondary rounded-full h-2">
                             <div
                                 className="bg-primary h-2 rounded-full transition-all"
@@ -214,14 +248,21 @@ function renderComponent(
 
         case "json":
             return (
-                <Card key={index} className="bg-card border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                <Card
+                    key={index}
+                    className="bg-card border-border flex flex-col h-full overflow-hidden"
+                >
+                    <div
+                        className="qb-card-header flex-shrink-0 flex items-center justify-between px-3 border-b border-border/40 bg-card"
+                        style={{ height: "var(--qb-card-header-height)" }}
+                    >
+                        <span className="text-xs font-medium text-muted-foreground truncate">
                             {comp.label}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <pre className="text-xs overflow-auto max-h-40 text-muted-foreground">
+                        </span>
+                        <DeleteBtn onDelete={onDelete} />
+                    </div>
+                    <CardContent className="flex-1 overflow-auto min-h-0 px-3 py-2">
+                        <pre className="text-xs text-muted-foreground">
                             {JSON.stringify(data, null, 2)}
                         </pre>
                     </CardContent>
@@ -230,13 +271,20 @@ function renderComponent(
 
         default:
             return (
-                <Card key={index} className="bg-card border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                <Card
+                    key={index}
+                    className="bg-card border-border flex flex-col h-full overflow-hidden"
+                >
+                    <div
+                        className="qb-card-header flex-shrink-0 flex items-center justify-between px-3 border-b border-border/40 bg-card"
+                        style={{ height: "var(--qb-card-header-height)" }}
+                    >
+                        <span className="text-xs font-medium text-muted-foreground truncate">
                             {comp.label || comp.field || comp.type}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                        </span>
+                        <DeleteBtn onDelete={onDelete} />
+                    </div>
+                    <CardContent className="flex-1 overflow-auto min-h-0 px-3 py-2">
                         <div className="text-xl font-bold">
                             {String(data[comp.field || ""] || "N/A")}
                         </div>
@@ -259,6 +307,7 @@ function renderComponentGroup(
     },
     sourceData: DataResponse | null,
     index: number,
+    onDelete?: () => void,
 ) {
     // For now, render as QuotaCard when group is specified
     const data = sourceData?.data || {};
@@ -275,6 +324,7 @@ function renderComponentGroup(
                 (data.usage as number) || 0,
                 (data.limit as number) || 0,
             )}
+            onDelete={onDelete}
         />
     );
 }
@@ -301,8 +351,9 @@ function Dashboard() {
         null,
     );
 
-    // Edit Layout State
-    const [isEditMode, setIsEditMode] = useState(false);
+    // GridStack ref
+    const gridRef = useRef<HTMLDivElement>(null);
+    const gsInstanceRef = useRef<GridStack | null>(null);
 
     const loadData = async () => {
         if (loadingRef.current) return;
@@ -357,9 +408,12 @@ function Dashboard() {
         // Ensure each item has a unique ID in the layout
         const newItemId = `widget-${Date.now()}`;
 
-        const newItem = {
+        const newItem: ViewItem = {
             id: newItemId,
+            x: 0,
+            y: 999, // large y so GridStack auto-places at bottom
             w: 4,
+            h: 2,
             source_id: sourceId,
             template_id: template.label || template.type || "",
             props: { ...template },
@@ -389,62 +443,90 @@ function Dashboard() {
         }
     };
 
-    const handleUpdateWidgetSize = async (index: number, dw: number) => {
+    const handleDeleteWidget = async (itemId: string) => {
         if (!viewConfig) return;
-        const newItems = [...viewConfig.items];
-        const item = newItems[index];
-        const newW = Math.max(
-            1,
-            Math.min(viewConfig.layout_columns, item.w + dw),
-        );
-        if (newW === item.w) return;
-
-        newItems[index] = { ...item, w: newW };
+        const newItems = viewConfig.items.filter((it) => it.id !== itemId);
         const updatedView = { ...viewConfig, items: newItems };
-
-        // Optimistic
         setViewConfig(updatedView);
-        api.updateView(updatedView.id, updatedView).catch((e) =>
-            console.error(e),
-        );
-    };
 
-    const handleMoveWidget = async (
-        index: number,
-        direction: "up" | "down",
-    ) => {
-        if (!viewConfig) return;
-        const newItems = [...viewConfig.items];
-        if (direction === "up" && index > 0) {
-            [newItems[index - 1], newItems[index]] = [
-                newItems[index],
-                newItems[index - 1],
-            ];
-        } else if (direction === "down" && index < newItems.length - 1) {
-            [newItems[index], newItems[index + 1]] = [
-                newItems[index + 1],
-                newItems[index],
-            ];
-        } else {
-            return;
+        // Also remove from GridStack DOM
+        const gs = gsInstanceRef.current;
+        if (gs) {
+            const el = gridRef.current?.querySelector(`[gs-id="${itemId}"]`);
+            if (el) gs.removeWidget(el as HTMLElement, false);
         }
 
-        const updatedView = { ...viewConfig, items: newItems };
-        setViewConfig(updatedView);
         api.updateView(updatedView.id, updatedView).catch((e) =>
             console.error(e),
         );
     };
 
-    const handleDeleteWidget = async (index: number) => {
-        if (!viewConfig) return;
-        const newItems = viewConfig.items.filter((_, i) => i !== index);
-        const updatedView = { ...viewConfig, items: newItems };
+    // Use a ref to always access the latest viewConfig in event handlers
+    const viewConfigRef = useRef(viewConfig);
+    useEffect(() => {
+        viewConfigRef.current = viewConfig;
+    }, [viewConfig]);
+
+    // Sync GridStack changes back to state/backend
+    const handleGridChange = useCallback(() => {
+        const gs = gsInstanceRef.current;
+        const currentViewConfig = viewConfigRef.current;
+        if (!gs || !currentViewConfig) return;
+
+        const nodes = gs
+            .getGridItems()
+            .map((el) => ({
+                id: el.getAttribute("gs-id") || "",
+                x: parseInt(el.getAttribute("gs-x") || "0"),
+                y: parseInt(el.getAttribute("gs-y") || "0"),
+                w: parseInt(el.getAttribute("gs-w") || "4"),
+                h: parseInt(el.getAttribute("gs-h") || "2"),
+            }))
+            .filter((n) => n.id !== ""); // Filter out phantom nodes without gs-id
+
+        // Merge coordinates back into viewConfig items
+        const updatedItems = currentViewConfig.items.map((item) => {
+            const node = nodes.find((n) => n.id === item.id);
+            if (node) {
+                return { ...item, x: node.x, y: node.y, w: node.w, h: node.h };
+            }
+            return item;
+        });
+
+        const updatedView = { ...currentViewConfig, items: updatedItems };
         setViewConfig(updatedView);
         api.updateView(updatedView.id, updatedView).catch((e) =>
             console.error(e),
         );
-    };
+    }, []); // No dependencies needed — uses refs for latest state
+
+    // Initialize and update GridStack
+    useEffect(() => {
+        if (!gridRef.current || !viewConfig || viewConfig.items.length === 0)
+            return;
+
+        const gs = gsInstanceRef.current;
+        if (!gs) {
+            // First init — always enabled (no edit mode toggle)
+            const instance = GridStack.init(
+                {
+                    column: viewConfig.layout_columns || 12,
+                    cellHeight: GRID_ROW_HEIGHT,
+                    margin: GRID_MARGIN,
+                    float: false,
+                    animate: true,
+                    draggable: { handle: ".qb-card-header" },
+                },
+                gridRef.current,
+            );
+            gsInstanceRef.current = instance;
+            instance.on("change", handleGridChange);
+        }
+
+        return () => {
+            // Don't destroy on every render
+        };
+    }, [viewConfig?.items.length, handleGridChange]);
 
     useEffect(() => {
         loadData();
@@ -976,14 +1058,6 @@ function Dashboard() {
                         <h2 className="text-lg font-semibold">监控视图</h2>
                         <div className="flex gap-2">
                             <Button
-                                variant={isEditMode ? "secondary" : "outline"}
-                                size="sm"
-                                onClick={() => setIsEditMode(!isEditMode)}
-                            >
-                                <Pencil className="w-4 h-4 mr-1" />
-                                {isEditMode ? "完成编辑" : "编辑排布"}
-                            </Button>
-                            <Button
                                 variant="default"
                                 size="sm"
                                 onClick={() => setIsAddDialogOpen(true)}
@@ -1006,13 +1080,7 @@ function Dashboard() {
                             </Button>
                         </div>
                     ) : (
-                        <div
-                            className="grid gap-4 grid-flow-row-dense"
-                            style={{
-                                gridTemplateColumns: `repeat(${viewConfig.layout_columns || 12}, minmax(0, 1fr))`,
-                                gridAutoRows: "minmax(80px, auto)",
-                            }}
-                        >
+                        <div ref={gridRef} className="grid-stack">
                             {viewConfig.items.map((item, index) => {
                                 const sourceData = item.source_id
                                     ? dataMap[item.source_id]
@@ -1034,126 +1102,27 @@ function Dashboard() {
 
                                 return (
                                     <div
-                                        key={index}
-                                        style={{
-                                            gridColumn: `span ${item.w}`,
-                                            display: "flex", // ensure children can fill
-                                            flexDirection: "column",
-                                        }}
-                                        className={`h-full min-h-0 relative ${isEditMode ? "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-xl" : ""}`}
+                                        key={item.id}
+                                        className="grid-stack-item"
+                                        gs-id={item.id}
+                                        gs-x={item.x ?? 0}
+                                        gs-y={item.y ?? 0}
+                                        gs-w={item.w ?? 4}
+                                        gs-h={item.h ?? 2}
                                     >
-                                        <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col [&>div]:h-full [&>div]:flex-1">
-                                            {renderComponent(
-                                                comp,
-                                                sourceData,
-                                                index,
-                                                sourceSummary,
-                                                setInteractSource,
-                                            )}
-                                        </div>
-
-                                        {isEditMode && (
-                                            <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] z-10 rounded-xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                                <div className="bg-background border border-border rounded-lg shadow-xl p-3 flex flex-col gap-3 min-w-[160px]">
-                                                    <div className="flex items-center justify-between gap-4">
-                                                        <span className="text-xs font-medium text-foreground">
-                                                            排序
-                                                        </span>
-                                                        <div className="flex items-center gap-1">
-                                                            <Button
-                                                                size="icon"
-                                                                variant="outline"
-                                                                className="h-6 w-6"
-                                                                onClick={() =>
-                                                                    handleMoveWidget(
-                                                                        index,
-                                                                        "up",
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    index === 0
-                                                                }
-                                                            >
-                                                                <ArrowLeft className="h-3 w-3" />
-                                                            </Button>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="outline"
-                                                                className="h-6 w-6"
-                                                                onClick={() =>
-                                                                    handleMoveWidget(
-                                                                        index,
-                                                                        "down",
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    index ===
-                                                                    viewConfig
-                                                                        .items
-                                                                        .length -
-                                                                        1
-                                                                }
-                                                            >
-                                                                <ArrowRight className="h-3 w-3" />
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center justify-between gap-4">
-                                                        <span className="text-xs font-medium text-foreground">
-                                                            宽度 ({item.w})
-                                                        </span>
-                                                        <div className="flex items-center gap-1">
-                                                            <Button
-                                                                size="icon"
-                                                                variant="outline"
-                                                                className="h-6 w-6"
-                                                                onClick={() =>
-                                                                    handleUpdateWidgetSize(
-                                                                        index,
-                                                                        -1,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    item.w <= 1
-                                                                }
-                                                            >
-                                                                <Minus className="h-3 w-3" />
-                                                            </Button>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="outline"
-                                                                className="h-6 w-6"
-                                                                onClick={() =>
-                                                                    handleUpdateWidgetSize(
-                                                                        index,
-                                                                        1,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    item.w >=
-                                                                    viewConfig.layout_columns
-                                                                }
-                                                            >
-                                                                <Plus className="h-3 w-3" />
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        className="w-full h-7 mt-1 text-xs"
-                                                        onClick={() =>
-                                                            handleDeleteWidget(
-                                                                index,
-                                                            )
-                                                        }
-                                                    >
-                                                        <Trash2 className="h-3 w-3 mr-1" />{" "}
-                                                        删除
-                                                    </Button>
-                                                </div>
+                                        <div className="grid-stack-item-content relative overflow-hidden group/card">
+                                            {/* Full-height pass-through — card components fill via h-full flex-col */}
+                                            <div className="w-full h-full flex flex-col [&>*]:flex-1 [&>*]:min-h-0">
+                                                {renderComponent(
+                                                    comp,
+                                                    sourceData,
+                                                    index,
+                                                    sourceSummary,
+                                                    setInteractSource,
+                                                    () => handleDeleteWidget(item.id),
+                                                )}
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
                                 );
                             })}

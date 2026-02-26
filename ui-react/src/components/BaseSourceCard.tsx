@@ -1,4 +1,5 @@
-import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
+import { Card } from "./ui/card";
+import { Trash2 } from "lucide-react";
 import type {
     ViewComponent,
     SourceSummary,
@@ -11,12 +12,23 @@ interface BaseSourceCardProps {
     sourceSummary?: SourceSummary;
     sourceData?: DataResponse | null;
     onInteract?: (source: SourceSummary) => void;
+    onDelete?: () => void;
 }
+
+// Radial gradient class for header background based on status
+const statusGradientMap: Record<string, string> = {
+    active:     "qb-header-gradient-active",
+    refreshing: "qb-header-gradient-refreshing",
+    suspended:  "qb-header-gradient-suspended",
+    error:      "qb-header-gradient-error",
+    disabled:   "qb-header-gradient-disabled",
+};
 
 export function BaseSourceCard({
     component,
     sourceSummary,
     sourceData,
+    onDelete,
 }: BaseSourceCardProps) {
     const ui = component.ui || {
         title: component.label || "Untitled",
@@ -24,7 +36,7 @@ export function BaseSourceCard({
         status_field: undefined,
     };
 
-    // Determine dot status (for the indicator only)
+    // Determine status for gradient indicator
     const rawStatus = sourceSummary?.status || "disabled";
     let dotStatus: "active" | "refreshing" | "error" | "suspended" | "disabled";
     if ((rawStatus as string) === "refreshing") {
@@ -39,14 +51,7 @@ export function BaseSourceCard({
         dotStatus = rawStatus as any;
     }
 
-    // Status dot color mapping
-    const statusColorMap: Record<string, string> = {
-        active: "bg-green-500",
-        refreshing: "bg-blue-400 animate-pulse",
-        suspended: "bg-yellow-500",
-        error: "bg-red-500",
-        disabled: "bg-gray-500",
-    };
+    const gradientClass = statusGradientMap[dotStatus] || statusGradientMap.disabled;
 
     // Decide if we have data to show
     const hasWidgetData =
@@ -54,24 +59,38 @@ export function BaseSourceCard({
     const hasNoData = !hasWidgetData;
 
     return (
-        <Card className="bg-card border-border flex flex-col h-full shadow-sm hover:shadow-md transition-shadow duration-200">
-            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                <div className="flex items-center gap-2">
-                    {ui.icon && <span className="text-xl">{ui.icon}</span>}
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
+        <Card className="bg-card border-border h-full flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+            {/* Header — left-top radial gradient encodes status; acts as drag handle */}
+            <div
+                title={`Status: ${dotStatus}`}
+                className={`qb-card-header flex-shrink-0 flex items-center justify-between px-3 border-b border-border/40 ${gradientClass}`}
+                style={{ height: "var(--qb-card-header-height)" }}
+            >
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    {ui.icon && (
+                        <span className="text-sm leading-none shrink-0">
+                            {ui.icon}
+                        </span>
+                    )}
+                    <span className="text-xs font-medium text-muted-foreground truncate">
                         {ui.title}
-                    </CardTitle>
+                    </span>
                 </div>
-                {/* Status Dot - only visual indicator for refresh/error/etc */}
-                <div
-                    title={`Status: ${dotStatus}`}
-                    className={`w-2.5 h-2.5 rounded-full ${statusColorMap[dotStatus] || "bg-gray-500"} shrink-0 ml-2`}
-                />
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col pt-2 pb-4">
-                {/* Always render widgets if data exists */}
+                {onDelete && (
+                    <button
+                        className="qb-delete-btn shrink-0 ml-2 opacity-0 group-hover/card:opacity-100 transition-opacity rounded p-0.5 text-muted-foreground hover:text-destructive-foreground hover:bg-destructive"
+                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                        title="删除"
+                    >
+                        <Trash2 className="h-3 w-3" />
+                    </button>
+                )}
+            </div>
+
+            {/* Content area — fills remaining card height */}
+            <div className="flex-1 flex flex-col overflow-hidden min-h-0 px-3 py-2">
                 {hasWidgetData && (
-                    <div className="flex flex-col gap-5 h-full pt-1">
+                    <div className="flex flex-col gap-2 h-full min-h-0">
                         {component.widgets!.map((widget, idx) => (
                             <WidgetRenderer
                                 key={idx}
@@ -82,13 +101,12 @@ export function BaseSourceCard({
                     </div>
                 )}
 
-                {/* No data placeholder */}
                 {hasNoData && (
-                    <div className="flex items-center justify-center flex-1 text-sm text-muted-foreground py-6 min-h-[120px]">
+                    <div className="flex items-center justify-center flex-1 text-sm text-muted-foreground">
                         暂无数据
                     </div>
                 )}
-            </CardContent>
+            </div>
         </Card>
     );
 }

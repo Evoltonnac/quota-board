@@ -27,6 +27,12 @@ export interface FieldMapping {
 export interface WidgetConfigBase {
     type: string;
     area?: string;
+    /**
+     * Proportional row-height weight used to distribute vertical space among sibling
+     * widgets inside a card.  Rendered as flex: <row_span> on the wrapper element.
+     * Default fallback by type: hero_metric=2, quota_bar=1, key_value_grid=2, list=2.
+     */
+    row_span?: number;
 }
 
 export interface HeroMetricWidget extends WidgetConfigBase {
@@ -184,7 +190,10 @@ export interface StatGridItem {
 
 export interface ViewItem {
     id: string;
+    x: number;
+    y: number;
     w: number;
+    h: number;
     source_id: string;
     template_id: string;
     props: Record<string, any>;

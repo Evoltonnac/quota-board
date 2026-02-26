@@ -36,7 +36,8 @@ All fields within widget configurations that need to display dynamic data must u
 Widgets within a card or a list are arranged using predefined layouts. This is particularly useful for maximizing space and creating structured displays.
 
 > [!NOTE]
-> Height Auto-Sizing: The view layer is designed as a Masonry-style (waterfall) grid. There are no `row` or `height` properties you can configure for widgets. **All widget heights adapt automatically to their content.** To manage components that could grow indefinitely (like lists), use the `pagination` or `limit` features to control their height naturally.
+> **Dashboard grid:** View items (cards) support `x`, `y`, `w`, `h` for grid position and size; the dashboard can use a grid layout (e.g. drag-and-drop).  
+> **Widget height:** Widgets can optionally set `row_span` (a proportional row-height weight) to share vertical space with siblings. When `row_span` is not set, widget height is content-driven. For components that could grow indefinitely (e.g. lists), use `pagination` or `limit` to control height.
 
 ### List Widget Layouts
 

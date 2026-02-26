@@ -24,8 +24,23 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
     --radius: 0.5rem;
+
+    /* GridStack grid row height tokens — keep in sync with GRID_ROW_HEIGHT / GRID_MARGIN in App.tsx */
+    --qb-row-height: 80px;
+    --qb-grid-margin: 8px;
+    /* Card header height = one full GridStack row minus top+bottom margin */
+    --qb-card-header-height: calc(var(--qb-row-height) - var(--qb-grid-margin) * 2);
+    /* Inner card padding */
+    --qb-card-padding: 12px;
   }
 }
+
+/* Utility classes for absolute widget row-span heights (based on GridStack cell) */
+.qb-rows-1 { min-height: calc(var(--qb-row-height) * 1 - var(--qb-grid-margin) * 2); }
+.qb-rows-2 { min-height: calc(var(--qb-row-height) * 2 - var(--qb-grid-margin) * 2); }
+.qb-rows-3 { min-height: calc(var(--qb-row-height) * 3 - var(--qb-grid-margin) * 2); }
+.qb-rows-4 { min-height: calc(var(--qb-row-height) * 4 - var(--qb-grid-margin) * 2); }
+.qb-rows-5 { min-height: calc(var(--qb-row-height) * 5 - var(--qb-grid-margin) * 2); }
 
 @layer base {
   * {
@@ -34,6 +49,65 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ── Card header drag handle ───────────────────────────────────────── */
+.qb-card-header {
+  cursor: grab;
+  user-select: none;
+}
+.qb-card-header:active {
+  cursor: grabbing;
+}
+
+/* Delete button — shown via group-hover/card, but also needs pointer reset
+   so clicks aren't swallowed by the drag handler */
+.qb-delete-btn {
+  cursor: pointer;
+}
+
+/* ── source_card status radial gradients (top-left origin) ─────────── */
+/* Gradient covers ~40% of header width and fades to transparent */
+.qb-header-gradient-active {
+  background: radial-gradient(
+    ellipse 50% 120% at 0% 50%,
+    rgba(34, 197, 94, 0.25) 0%,
+    transparent 100%
+  ), hsl(var(--card));
+}
+.qb-header-gradient-refreshing {
+  background: radial-gradient(
+    ellipse 50% 120% at 0% 50%,
+    rgba(96, 165, 250, 0.30) 0%,
+    transparent 100%
+  ), hsl(var(--card));
+  animation: qb-pulse-gradient 1.6s ease-in-out infinite;
+}
+.qb-header-gradient-suspended {
+  background: radial-gradient(
+    ellipse 50% 120% at 0% 50%,
+    rgba(234, 179, 8, 0.25) 0%,
+    transparent 100%
+  ), hsl(var(--card));
+}
+.qb-header-gradient-error {
+  background: radial-gradient(
+    ellipse 50% 120% at 0% 50%,
+    rgba(239, 68, 68, 0.28) 0%,
+    transparent 100%
+  ), hsl(var(--card));
+}
+.qb-header-gradient-disabled {
+  background: radial-gradient(
+    ellipse 50% 120% at 0% 50%,
+    rgba(107, 114, 128, 0.18) 0%,
+    transparent 100%
+  ), hsl(var(--card));
+}
+
+@keyframes qb-pulse-gradient {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
 }
 
 :root {
