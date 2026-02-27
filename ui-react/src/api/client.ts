@@ -202,11 +202,8 @@ class ApiClient {
     integration_id?: string;
     vars?: Record<string, any>;
   }): Promise<any> {
-    // Auto-generate ID from name
-    const id = config.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
+    // Auto-generate unique hash ID
+    const id = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
 
     const source = {
       id,

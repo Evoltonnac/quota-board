@@ -31,3 +31,7 @@ Thumbs.db
 ui-react/src-tauri/binaries/
 ui-react/src-tauri/target/
 ui-react/src-tauri/gen/
+
+# agent
+.agent/
+.agents/
