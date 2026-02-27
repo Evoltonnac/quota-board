@@ -55,7 +55,7 @@ import IntegrationsPage from "./pages/Integrations";
 import { TopNav } from "./components/TopNav";
 
 // GridStack layout constants — keep in sync with --qb-row-height / --qb-grid-margin in index.css
-const GRID_ROW_HEIGHT = 80;
+const GRID_ROW_HEIGHT = 60;
 const GRID_MARGIN = 8;
 
 // Format value helper
@@ -91,16 +91,19 @@ function getStatus(
     return "ok";
 }
 
-// Delete button shown on header hover
+// Delete button — absolute positioned at top-right corner of card
 function DeleteBtn({ onDelete }: { onDelete?: () => void }) {
     if (!onDelete) return null;
     return (
         <button
-            className="qb-delete-btn shrink-0 ml-2 opacity-0 group-hover/card:opacity-100 transition-opacity rounded p-0.5 text-muted-foreground hover:text-destructive-foreground hover:bg-destructive"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="qb-delete-btn"
+            onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+            }}
             title="删除"
         >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-3.5 w-3.5" />
         </button>
     );
 }
@@ -112,14 +115,13 @@ function renderComponent(
     index: number,
     sourceSummary?: SourceSummary,
     onInteract?: (source: SourceSummary) => void,
-    onDelete?: () => void,
 ) {
     const data = sourceData?.data || {};
     const error = sourceData?.error;
 
     // Handle use_group (component groups)
     if (comp.use_group) {
-        return renderComponentGroup(comp, sourceData, index, onDelete);
+        return renderComponentGroup(comp, sourceData, index);
     }
 
     switch (comp.type) {
@@ -131,7 +133,6 @@ function renderComponent(
                     sourceSummary={sourceSummary}
                     sourceData={sourceData}
                     onInteract={onInteract}
-                    onDelete={onDelete}
                 />
             );
 
@@ -149,7 +150,6 @@ function renderComponent(
                         (data.usage as number) || 0,
                         (data.limit as number) || 0,
                     )}
-                    onDelete={onDelete}
                 />
             );
 
@@ -161,7 +161,6 @@ function renderComponent(
                     items={comp.items || []}
                     data={data}
                     columns={comp.columns || 4}
-                    onDelete={onDelete}
                 />
             );
 
@@ -178,7 +177,6 @@ function renderComponent(
                         <span className="text-xs font-medium text-muted-foreground truncate">
                             {comp.label || comp.field}
                         </span>
-                        <DeleteBtn onDelete={onDelete} />
                     </div>
                     <CardContent className="flex-1 overflow-auto min-h-0 flex flex-col justify-center px-3 py-2">
                         <div className="text-2xl font-bold">
@@ -228,7 +226,6 @@ function renderComponent(
                         <span className="text-xs font-medium text-muted-foreground truncate">
                             {comp.label}
                         </span>
-                        <DeleteBtn onDelete={onDelete} />
                     </div>
                     <CardContent className="flex-1 overflow-auto min-h-0 flex flex-col justify-center px-3 py-2">
                         <div className="w-full bg-secondary rounded-full h-2">
@@ -259,7 +256,6 @@ function renderComponent(
                         <span className="text-xs font-medium text-muted-foreground truncate">
                             {comp.label}
                         </span>
-                        <DeleteBtn onDelete={onDelete} />
                     </div>
                     <CardContent className="flex-1 overflow-auto min-h-0 px-3 py-2">
                         <pre className="text-xs text-muted-foreground">
@@ -282,7 +278,6 @@ function renderComponent(
                         <span className="text-xs font-medium text-muted-foreground truncate">
                             {comp.label || comp.field || comp.type}
                         </span>
-                        <DeleteBtn onDelete={onDelete} />
                     </div>
                     <CardContent className="flex-1 overflow-auto min-h-0 px-3 py-2">
                         <div className="text-xl font-bold">
@@ -307,7 +302,6 @@ function renderComponentGroup(
     },
     sourceData: DataResponse | null,
     index: number,
-    onDelete?: () => void,
 ) {
     // For now, render as QuotaCard when group is specified
     const data = sourceData?.data || {};
@@ -324,7 +318,6 @@ function renderComponentGroup(
                 (data.usage as number) || 0,
                 (data.limit as number) || 0,
             )}
-            onDelete={onDelete}
         />
     );
 }
@@ -354,6 +347,8 @@ function Dashboard() {
     // GridStack ref
     const gridRef = useRef<HTMLDivElement>(null);
     const gsInstanceRef = useRef<GridStack | null>(null);
+    // Flag to suppress GridStack change events during programmatic updates (e.g. delete)
+    const suppressGridChangeRef = useRef(false);
 
     const loadData = async () => {
         if (loadingRef.current) return;
@@ -447,13 +442,24 @@ function Dashboard() {
         if (!viewConfig) return;
         const newItems = viewConfig.items.filter((it) => it.id !== itemId);
         const updatedView = { ...viewConfig, items: newItems };
+
+        // Eagerly update the ref so any GridStack change event sees the new state
+        viewConfigRef.current = updatedView;
         setViewConfig(updatedView);
 
-        // Also remove from GridStack DOM
+        // Suppress change events while we programmatically remove the widget,
+        // because GridStack re-layouts remaining items and fires 'change',
+        // which would otherwise merge with stale viewConfig and restore the deleted item.
         const gs = gsInstanceRef.current;
         if (gs) {
+            suppressGridChangeRef.current = true;
             const el = gridRef.current?.querySelector(`[gs-id="${itemId}"]`);
             if (el) gs.removeWidget(el as HTMLElement, false);
+            // Allow the suppress flag to persist through the synchronous event dispatch,
+            // then clear it asynchronously so future user-driven changes still work.
+            requestAnimationFrame(() => {
+                suppressGridChangeRef.current = false;
+            });
         }
 
         api.updateView(updatedView.id, updatedView).catch((e) =>
@@ -469,6 +475,9 @@ function Dashboard() {
 
     // Sync GridStack changes back to state/backend
     const handleGridChange = useCallback(() => {
+        // Skip change events triggered by programmatic widget removal
+        if (suppressGridChangeRef.current) return;
+
         const gs = gsInstanceRef.current;
         const currentViewConfig = viewConfigRef.current;
         if (!gs || !currentViewConfig) return;
@@ -516,17 +525,30 @@ function Dashboard() {
                     float: false,
                     animate: true,
                     draggable: { handle: ".qb-card-header" },
+                    resizable: { handles: "se" },
                 },
                 gridRef.current,
             );
             gsInstanceRef.current = instance;
             instance.on("change", handleGridChange);
+        } else {
+            // React re-renders (like data loading or new item addition) can strip
+            // GridStack classes and lose grid styles. Re-initialize items.
+            setTimeout(() => {
+                if (gridRef.current && gsInstanceRef.current) {
+                    const elements =
+                        gridRef.current.querySelectorAll(".grid-stack-item");
+                    elements.forEach((el) => {
+                        gsInstanceRef.current!.makeWidget(el as HTMLElement);
+                    });
+                }
+            }, 0);
         }
 
         return () => {
             // Don't destroy on every render
         };
-    }, [viewConfig?.items.length, handleGridChange]);
+    }, [viewConfig?.items, dataMap, handleGridChange]);
 
     useEffect(() => {
         loadData();
@@ -1080,7 +1102,10 @@ function Dashboard() {
                             </Button>
                         </div>
                     ) : (
-                        <div ref={gridRef} className="grid-stack">
+                        <div
+                            ref={gridRef}
+                            className={`grid-stack grid-stack-${viewConfig.layout_columns || 12}`}
+                        >
                             {viewConfig.items.map((item, index) => {
                                 const sourceData = item.source_id
                                     ? dataMap[item.source_id]
@@ -1105,12 +1130,19 @@ function Dashboard() {
                                         key={item.id}
                                         className="grid-stack-item"
                                         gs-id={item.id}
-                                        gs-x={item.x ?? 0}
-                                        gs-y={item.y ?? 0}
-                                        gs-w={item.w ?? 4}
-                                        gs-h={item.h ?? 2}
+                                        gs-x={String(item.x ?? 0)}
+                                        gs-y={String(item.y ?? 0)}
+                                        gs-w={String(item.w ?? 4)}
+                                        gs-h={String(item.h ?? 2)}
                                     >
                                         <div className="grid-stack-item-content relative overflow-hidden group/card">
+                                            {/* Delete button overlay — top-right corner */}
+                                            <DeleteBtn
+                                                onDelete={() =>
+                                                    handleDeleteWidget(item.id)
+                                                }
+                                            />
+
                                             {/* Full-height pass-through — card components fill via h-full flex-col */}
                                             <div className="w-full h-full flex flex-col [&>*]:flex-1 [&>*]:min-h-0">
                                                 {renderComponent(
@@ -1119,7 +1151,6 @@ function Dashboard() {
                                                     index,
                                                     sourceSummary,
                                                     setInteractSource,
-                                                    () => handleDeleteWidget(item.id),
                                                 )}
                                             </div>
                                         </div>

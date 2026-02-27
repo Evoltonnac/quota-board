@@ -1,6 +1,5 @@
 import { Card, CardContent } from "./ui/card";
 import type { ComponentType } from "react";
-import { Trash2 } from "lucide-react";
 import {
     TrendingUp,
     TrendingDown,
@@ -102,7 +101,6 @@ export interface StatGridProps {
     data: Record<string, any>;
     columns?: number;
     className?: string;
-    onDelete?: () => void;
 }
 
 export function StatGrid({
@@ -111,7 +109,6 @@ export function StatGrid({
     data,
     columns = 2,
     className,
-    onDelete,
 }: StatGridProps) {
     return (
         <Card
@@ -129,15 +126,6 @@ export function StatGrid({
                     <span className="text-xs font-medium text-muted-foreground truncate">
                         {title}
                     </span>
-                    {onDelete && (
-                        <button
-                            className="qb-delete-btn shrink-0 ml-2 opacity-0 group-hover/card:opacity-100 transition-opacity rounded p-0.5 text-muted-foreground hover:text-destructive-foreground hover:bg-destructive"
-                            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                            title="删除"
-                        >
-                            <Trash2 className="h-3 w-3" />
-                        </button>
-                    )}
                 </div>
             )}
             <CardContent className="flex-1 overflow-auto min-h-0 px-3 py-2">

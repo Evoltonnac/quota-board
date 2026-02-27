@@ -26,7 +26,7 @@
     --radius: 0.5rem;
 
     /* GridStack grid row height tokens — keep in sync with GRID_ROW_HEIGHT / GRID_MARGIN in App.tsx */
-    --qb-row-height: 80px;
+    --qb-row-height: 60px;
     --qb-grid-margin: 8px;
     /* Card header height = one full GridStack row minus top+bottom margin */
     --qb-card-header-height: calc(var(--qb-row-height) - var(--qb-grid-margin) * 2);
@@ -60,11 +60,38 @@
   cursor: grabbing;
 }
 
-/* Delete button — shown via group-hover/card, but also needs pointer reset
-   so clicks aren't swallowed by the drag handler */
+/* ── Delete button overlay — top-right corner ──────────────────────── */
 .qb-delete-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  pointer-events: auto;
 }
+.group\/card:hover .qb-delete-btn {
+  opacity: 1;
+}
+.qb-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #dc2626;
+}
+.qb-delete-btn:active {
+  background: rgba(239, 68, 68, 0.35);
+}
+
+
 
 /* ── source_card status radial gradients (top-left origin) ─────────── */
 /* Gradient covers ~40% of header width and fades to transparent */

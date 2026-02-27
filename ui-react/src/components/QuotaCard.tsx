@@ -7,7 +7,6 @@ import {
     AlertCircle,
     CheckCircle2,
     XCircle,
-    Trash2,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -86,7 +85,6 @@ export interface QuotaCardProps {
     trendValue?: number | string;
     status?: "ok" | "warning" | "critical" | "error";
     className?: string;
-    onDelete?: () => void;
 }
 
 export function QuotaCard({
@@ -101,7 +99,6 @@ export function QuotaCard({
     trendValue,
     status = "ok",
     className,
-    onDelete,
 }: QuotaCardProps) {
     // Get values from data if not provided directly
     const limitValue = limit ?? data.limit ?? data.limit_total;
@@ -134,15 +131,6 @@ export function QuotaCard({
                     </span>
                     <span className="shrink-0">{getStatusIcon(status)}</span>
                 </div>
-                {onDelete && (
-                    <button
-                        className="qb-delete-btn shrink-0 ml-2 opacity-0 group-hover/card:opacity-100 transition-opacity rounded p-0.5 text-muted-foreground hover:text-destructive-foreground hover:bg-destructive"
-                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                        title="删除"
-                    >
-                        <Trash2 className="h-3 w-3" />
-                    </button>
-                )}
             </div>
             <CardContent className="flex-1 overflow-auto min-h-0 flex flex-col justify-center px-3 py-2">
                 {/* Main value display */}

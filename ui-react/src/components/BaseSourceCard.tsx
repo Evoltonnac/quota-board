@@ -1,5 +1,4 @@
 import { Card } from "./ui/card";
-import { Trash2 } from "lucide-react";
 import type {
     ViewComponent,
     SourceSummary,
@@ -12,23 +11,21 @@ interface BaseSourceCardProps {
     sourceSummary?: SourceSummary;
     sourceData?: DataResponse | null;
     onInteract?: (source: SourceSummary) => void;
-    onDelete?: () => void;
 }
 
 // Radial gradient class for header background based on status
 const statusGradientMap: Record<string, string> = {
-    active:     "qb-header-gradient-active",
+    active: "qb-header-gradient-active",
     refreshing: "qb-header-gradient-refreshing",
-    suspended:  "qb-header-gradient-suspended",
-    error:      "qb-header-gradient-error",
-    disabled:   "qb-header-gradient-disabled",
+    suspended: "qb-header-gradient-suspended",
+    error: "qb-header-gradient-error",
+    disabled: "qb-header-gradient-disabled",
 };
 
 export function BaseSourceCard({
     component,
     sourceSummary,
     sourceData,
-    onDelete,
 }: BaseSourceCardProps) {
     const ui = component.ui || {
         title: component.label || "Untitled",
@@ -51,7 +48,8 @@ export function BaseSourceCard({
         dotStatus = rawStatus as any;
     }
 
-    const gradientClass = statusGradientMap[dotStatus] || statusGradientMap.disabled;
+    const gradientClass =
+        statusGradientMap[dotStatus] || statusGradientMap.disabled;
 
     // Decide if we have data to show
     const hasWidgetData =
@@ -76,15 +74,6 @@ export function BaseSourceCard({
                         {ui.title}
                     </span>
                 </div>
-                {onDelete && (
-                    <button
-                        className="qb-delete-btn shrink-0 ml-2 opacity-0 group-hover/card:opacity-100 transition-opacity rounded p-0.5 text-muted-foreground hover:text-destructive-foreground hover:bg-destructive"
-                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                        title="删除"
-                    >
-                        <Trash2 className="h-3 w-3" />
-                    </button>
-                )}
             </div>
 
             {/* Content area — fills remaining card height */}
