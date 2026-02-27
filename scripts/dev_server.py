@@ -18,7 +18,6 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 监控的目录
 WATCH_DIRS = [
     os.path.join(PROJECT_ROOT, "core"),
-    os.path.join(PROJECT_ROOT, "config"),
 ]
 # 同时监控 main.py
 WATCH_FILES_EXTRA = [
