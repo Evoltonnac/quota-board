@@ -198,7 +198,7 @@ export function ListWidget({ widget, data }: Props) {
                     return (
                         <div
                             key={index}
-                            className={`w-full border border-border/50 rounded-md p-2 bg-secondary/10 ${isGridItem ? "" : "flex flex-col gap-1.5"}`}
+                            className={`w-full h-full border border-border/50 rounded-md p-2 bg-secondary/10 ${isGridItem ? "" : "flex flex-col gap-1.5"}`}
                             style={wrapperStyle}
                         >
                             {renders.map((childWidget, i) => (
@@ -209,6 +209,7 @@ export function ListWidget({ widget, data }: Props) {
                                             ? { gridArea: childWidget.area }
                                             : undefined
                                     }
+                                    className="w-full h-full flex flex-col min-h-0 min-w-0"
                                 >
                                     <WidgetRenderer
                                         widget={childWidget}
