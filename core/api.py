@@ -7,10 +7,14 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
+from pydantic import BaseModel
 from core.models import StoredSource, StoredView, ViewItem
 from core.integration_manager import IntegrationManager
 from core.source_state import SourceStatus, InteractionRequest
 import yaml
+
+class FileContentRequest(BaseModel):
+    content: str
 
 logger = logging.getLogger(__name__)
 
@@ -515,18 +519,18 @@ async def get_integration_file(integration_id: str) -> dict:
 
 
 @router.post("/integrations/files")
-async def create_integration_file(integration_id: str, content: str = "") -> dict:
+async def create_integration_file(filename: str, request: FileContentRequest) -> dict:
     """创建新的集成 YAML 文件。"""
-    success = _integration_manager.create_integration(integration_id, content)
+    success = _integration_manager.create_integration(filename, request.content)
     if not success:
-        raise HTTPException(500, f"Failed to create integration {integration_id}")
-    return {"message": f"Integration {integration_id} created", "integration_id": integration_id}
+        raise HTTPException(500, f"Failed to create integration {filename}")
+    return {"message": f"Integration {filename} created", "integration_id": filename}
 
 
 @router.put("/integrations/files/{integration_id}")
-async def update_integration_file(integration_id: str, content: str) -> dict:
+async def update_integration_file(integration_id: str, request: FileContentRequest) -> dict:
     """更新集成 YAML 文件内容。"""
-    success = _integration_manager.save_integration(integration_id, content)
+    success = _integration_manager.save_integration(integration_id, request.content)
     if not success:
         raise HTTPException(500, f"Failed to save integration {integration_id}")
     return {"message": f"Integration {integration_id} saved", "integration_id": integration_id}
